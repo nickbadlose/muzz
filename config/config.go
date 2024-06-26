@@ -14,10 +14,8 @@ const (
 )
 
 type Config struct {
-	host string
+	Host string
 }
-
-func (c *Config) Host() string { return c.host }
 
 // MustLoad returns a new *Config struct, configured form the environment.
 // It panics if any configurations are not provided.
@@ -27,7 +25,7 @@ func MustLoad() *Config {
 		host = defaultHost
 	}
 
-	return &Config{host: fmt.Sprintf(":%s", host)}
+	return &Config{Host: fmt.Sprintf(":%s", host)}
 }
 
 func getString(key string) string {

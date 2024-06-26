@@ -14,10 +14,6 @@ import (
 )
 
 const (
-	// cfgDefaultHost is the default host/port for the web app.
-	cfgDefaultHost = "3002"
-	// cfgHost is the configuration key for the host/port to bind to.
-	cfgHost = "host"
 	// the timeout for the server to be idle before forcing a shutdown whilst attempting a graceful shutdown.
 	idleTimeout = 30 * time.Second
 )
@@ -32,11 +28,11 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	server := &http.Server{
 		Handler: router.New(),
-		Addr:    cfg.Host(),
+		Addr:    cfg.Host,
 	}
 
 	go func() {
-		fmt.Printf("listening on port: %v\n", cfg.Host())
+		fmt.Printf("listening on port: %v\n", cfg.Host)
 		err := server.ListenAndServe()
 		if err != nil {
 			log.Fatalf("starting server: %s", err)

@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  api:
+    container_name: api
+    restart: always
+    env_file: .env
+    environment:
+      - HOST=${HOST}
+    build:
+      target: development
+      context: .
+      args:
+        - GOLANG_VERSION=1.22.4
+        - ALPINE_VERSION=3.20
+    ports:
+      - "3000:3000"
+    links:
+      - db
+    networks:
+      - api
+
+  db:
+    container_name: postgres
+    image: postgres:16.3
+    restart: always
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - source: database
+        target: /var/lib/postgresql/data
+        type: volume
+    ports:
+      - "5432:5432"
+    networks:
+      - api
+
+# TODO adminer
+
+volumes:
+  database: {}
+
+networks:
+  api:
+    driver: bridge
+    internal: false
