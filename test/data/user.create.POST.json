@@ -1,0 +1,10 @@
+{
+  "result": {
+    "id": 1,
+    "email": "test@test.com",
+    "password": "password",
+    "name": "test",
+    "gender": "female",
+    "age": 25
+  }
+}

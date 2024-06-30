@@ -26,3 +26,6 @@ go.work.sum
 
 # TODO remove
 client
+
+# Env file
+.env

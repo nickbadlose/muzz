@@ -6,7 +6,11 @@ services:
     restart: always
     env_file: .env
     environment:
-      - HOST=${HOST}
+      PORT: ${PORT}
+      DATABASE_USER: ${DATABASE_USER}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE: ${DATABASE}
     build:
       target: development
       context: .
@@ -26,9 +30,9 @@ services:
     restart: always
     env_file: .env
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${DATABASE_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE}
     volumes:
       - source: database
         target: /var/lib/postgresql/data

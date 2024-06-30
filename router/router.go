@@ -1,14 +1,20 @@
 package router
 
 import (
+	"github.com/nickbadlose/muzz/internal/app"
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
-	"net/http"
 )
 
-func New() http.Handler {
+func New(h app.Handlers) http.Handler {
 	r := chi.NewRouter()
+
+	// TODO
+	//  - context middleware
+	//  - 405/404 middleware
 
 	r.Use(
 		middleware.AllowContentType("application/json"),
@@ -23,6 +29,8 @@ func New() http.Handler {
 		w.WriteHeader(http.StatusOK)
 		render.JSON(w, r, map[string]string{"status": "ok"})
 	})
+
+	r.Post("/user/create", h.CreateUser)
 
 	return r
 }

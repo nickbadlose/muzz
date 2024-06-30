@@ -2,11 +2,10 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/nickbadlose/muzz/router"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,37 +14,110 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/nickbadlose/muzz/internal/app"
+	"github.com/nickbadlose/muzz/internal/database"
+	"github.com/nickbadlose/muzz/router"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-type User struct {
-	Id       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Gender   string `json:"gender"`
-	Age      int    `json:"age"`
+func setupDB(t *testing.T) database.Database {
+	// test migrator to set up and teardown test db.
+	testM, err := migrate.New(
+		"file://./migrations",
+		"postgres://nick:password@localhost:5432/postgres?sslmode=disable",
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err = testM.Down()
+		if !errors.Is(err, migrate.ErrNoChange) {
+			require.NoError(t, err)
+		}
+		sErr, dErr := testM.Close()
+		require.NoError(t, sErr)
+		require.NoError(t, dErr)
+	})
+
+	err = testM.Up()
+	if !errors.Is(err, migrate.ErrNoChange) {
+		require.NoError(t, err)
+	}
+
+	// app migrator to run application migrations.
+	appM, err := migrate.New(
+		"file://../migrations",
+		"postgres://nick:password@localhost:5432/test?sslmode=disable",
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err = appM.Down()
+		require.NoError(t, err)
+		sErr, dErr := appM.Close()
+		require.NoError(t, sErr)
+		require.NoError(t, dErr)
+	})
+
+	err = appM.Up()
+	if !errors.Is(err, migrate.ErrNoChange) {
+		require.NoError(t, err)
+	}
+
+	db, err := database.New(context.Background(), &database.Config{
+		Username: "nick",
+		Password: "password",
+		Name:     "test",
+		Host:     "localhost:5432",
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, db.Close())
+	})
+
+	return db
 }
 
 func TestSuccess(t *testing.T) {
 	cases := []struct {
 		endpoint, method string
+		body             interface{}
+		res              interface{}
 		expectedCode     int
 	}{
-		{"status", http.MethodGet, http.StatusOK},
+		{endpoint: "status", method: http.MethodGet, expectedCode: http.StatusOK},
+		{
+			endpoint: "user/create",
+			method:   http.MethodPost,
+			body: &UserInput{
+				Email:    "test@test.com",
+				Password: "password",
+				Name:     "test",
+				Gender:   "female",
+				Age:      25,
+			},
+			expectedCode: http.StatusCreated,
+		},
 	}
 
-	srv := httptest.NewServer(router.New())
-	defer srv.Close()
 	for _, tc := range cases {
 		t.Run(tc.endpoint, func(t *testing.T) {
+			db := setupDB(t)
+			service := app.NewService(db)
+			handlers := app.NewHandlers(service)
 
-			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), nil)
+			srv := httptest.NewServer(router.New(handlers))
+			t.Cleanup(srv.Close)
+
+			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), tc.body)
 			require.Equal(t, tc.expectedCode, resp.StatusCode)
 
 			testDir := getTestDataDirectory()
 			expected, err := os.ReadFile(filepath.Join(
 				testDir,
-				strings.ReplaceAll(fmt.Sprintf("%s.%d.json", tc.endpoint, tc.expectedCode), "/", "."),
+				strings.ReplaceAll(fmt.Sprintf("%s.%s.json", tc.endpoint, tc.method), "/", "."),
 			))
 			require.NoError(t, err)
 
