@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/nickbadlose/muzz/internal/store"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +20,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/nickbadlose/muzz/internal/app"
-	"github.com/nickbadlose/muzz/internal/database"
+	"github.com/nickbadlose/muzz/internal/pkg/database"
 	"github.com/nickbadlose/muzz/router"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,6 +48,7 @@ func setupDB(t *testing.T) database.Database {
 		require.NoError(t, err)
 	}
 
+	// TODO run appM.Drop at the start of each migration to clear all data if db already existed
 	// app migrator to run application migrations.
 	appM, err := migrate.New(
 		"file://../migrations",
@@ -91,11 +93,11 @@ func TestSuccess(t *testing.T) {
 		{
 			endpoint: "user/create",
 			method:   http.MethodPost,
-			body: &UserInput{
+			body: &app.CreateUserRequest{
 				Email:    "test@test.com",
-				Password: "password",
+				Password: "Pa55w0rd!",
 				Name:     "test",
-				Gender:   "female",
+				Gender:   app.GenderFemale,
 				Age:      25,
 			},
 			expectedCode: http.StatusCreated,
@@ -105,7 +107,8 @@ func TestSuccess(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.endpoint, func(t *testing.T) {
 			db := setupDB(t)
-			service := app.NewService(db)
+			storage := store.New(db)
+			service := app.NewService(storage)
 			handlers := app.NewHandlers(service)
 
 			srv := httptest.NewServer(router.New(handlers))

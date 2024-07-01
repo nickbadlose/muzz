@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/nickbadlose/muzz/internal/store"
 	"log"
 	"net/http"
 	"os"
@@ -12,8 +13,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/app"
-	"github.com/nickbadlose/muzz/internal/database"
-	"github.com/nickbadlose/muzz/internal/logger"
+	"github.com/nickbadlose/muzz/internal/pkg/database"
+	"github.com/nickbadlose/muzz/internal/pkg/logger"
 	"github.com/nickbadlose/muzz/router"
 )
 
@@ -41,7 +42,6 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
-	// TODO get from env
 	db, err := database.New(ctx, &database.Config{
 		Username:     cfg.DatabaseUser,
 		Password:     cfg.DatabasePassword,
@@ -53,7 +53,8 @@ func main() {
 		log.Fatalf("failed to initialize database: %s", err)
 	}
 
-	service := app.NewService(db)
+	storage := store.New(db)
+	service := app.NewService(storage)
 	handlers := app.NewHandlers(service)
 
 	// TODO server configuration

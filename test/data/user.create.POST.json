@@ -2,7 +2,7 @@
   "result": {
     "id": 1,
     "email": "test@test.com",
-    "password": "password",
+    "password": "Pa55w0rd!",
     "name": "test",
     "gender": "female",
     "age": 25

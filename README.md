@@ -18,6 +18,7 @@ breaking changes for clients of the package, admittedly with potential difficult
 TODO
 - package level doc - doc.go
 - package level tests
+- mock db
 
 ## Log Package
 
