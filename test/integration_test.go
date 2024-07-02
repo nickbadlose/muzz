@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/nickbadlose/muzz/config"
+	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -112,10 +113,12 @@ func TestSuccess(t *testing.T) {
 		t.Run(tc.endpoint, func(t *testing.T) {
 			db := setupDB(t)
 			str := store.New(db)
-			svc := app.NewService(str, config.Load())
+			cfg := config.Load()
+			au := auth.NewAuthoriser(cfg)
+			svc := app.NewService(str, au)
 			h := handlers.NewHandlers(svc)
 
-			srv := httptest.NewServer(router.New(h))
+			srv := httptest.NewServer(router.New(h, au))
 			t.Cleanup(srv.Close)
 
 			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), tc.body)

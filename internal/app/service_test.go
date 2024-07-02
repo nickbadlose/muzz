@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"errors"
+	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -14,15 +15,21 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+func newTestService(m *mockstore.Store) Service {
+	cfg := config.Load()
+	au := auth.NewAuthoriser(cfg)
+	return NewService(m, au)
+}
+
 func TestNewService(t *testing.T) {
-	svc := NewService(mockstore.NewStore(t), config.Load())
+	svc := newTestService(&mockstore.Store{})
 	assert.NotNil(t, svc)
 }
 
 func TestService_CreateUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		m := mockstore.NewStore(t)
-		sut := NewService(m, config.Load())
+		sut := newTestService(m)
 
 		m.EXPECT().
 			CreateUser(mock.Anything, &store.CreateUserInput{
@@ -151,7 +158,7 @@ func TestService_CreateUser(t *testing.T) {
 
 	for _, tc := range validationCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sut := NewService(mockstore.NewStore(t), config.Load())
+			sut := newTestService(&mockstore.Store{})
 
 			got, err := sut.CreateUser(context.Background(), tc.req)
 			assert.Nil(t, got)
@@ -186,7 +193,7 @@ func TestService_CreateUser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockstore.NewStore(t)
 			tc.setupMockStore(m)
-			sut := NewService(m, config.Load())
+			sut := newTestService(m)
 
 			got, err := sut.CreateUser(context.Background(), tc.req)
 			assert.Nil(t, got)
@@ -203,7 +210,7 @@ func TestService_Login(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		m := mockstore.NewStore(t)
-		sut := NewService(m, config.Load())
+		sut := newTestService(m)
 
 		m.EXPECT().
 			GetUserByEmail(mock.Anything, "test@test.com").Once().Return(
@@ -217,15 +224,17 @@ func TestService_Login(t *testing.T) {
 			}, nil,
 		)
 
+		// TODO test claims in auth package, noot here.
+
 		got, err := sut.Login(context.Background(), &LoginRequest{Email: "test@test.com", Password: "Pa55w0rd!"})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, got)
-		claims := &Claims{}
+		claims := &auth.Claims{}
 		tkn, pErr := jwt.ParseWithClaims(got, claims, func(token *jwt.Token) (interface{}, error) {
 			return []byte("test"), nil
 		})
 		assert.NoError(t, pErr)
-		assert.Equal(t, 1, claims.ID)
+		assert.Equal(t, 1, claims.UserID)
 		assert.Equal(t, "https://test.com", claims.Issuer)
 		assert.Equal(t, jwt.ClaimStrings{"https://test.com"}, claims.Audience)
 		assert.True(t, tkn.Valid)
@@ -250,7 +259,7 @@ func TestService_Login(t *testing.T) {
 
 	for _, tc := range validationCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sut := NewService(mockstore.NewStore(t), config.Load())
+			sut := newTestService(&mockstore.Store{})
 
 			got, err := sut.Login(context.Background(), tc.req)
 			assert.Empty(t, got)
@@ -309,7 +318,7 @@ func TestService_Login(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockstore.NewStore(t)
 			tc.setupMockStore(m)
-			sut := NewService(m, config.Load())
+			sut := newTestService(m)
 
 			got, err := sut.Login(context.Background(), tc.req)
 			assert.Empty(t, got)

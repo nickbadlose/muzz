@@ -21,6 +21,8 @@ type (
 	Iterator = db.Iterator
 )
 
+// TODO docs
+
 type Database interface {
 	ReadSessionContext(ctx context.Context) (Reader, error)
 	WriteSessionContext(ctx context.Context) (Writer, error)

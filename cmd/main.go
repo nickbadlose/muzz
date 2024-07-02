@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/nickbadlose/muzz/internal/http/handlers"
 	"github.com/nickbadlose/muzz/internal/http/router"
+	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"github.com/nickbadlose/muzz/internal/store"
 	"log"
 	"net/http"
@@ -48,13 +49,14 @@ func main() {
 		log.Fatalf("failed to initialize database: %s", err)
 	}
 
-	storage := store.New(db)
-	service := app.NewService(storage, cfg)
-	hand := handlers.NewHandlers(service)
+	str := store.New(db)
+	au := auth.NewAuthoriser(cfg)
+	svc := app.NewService(str, au)
+	hlr := handlers.NewHandlers(svc)
 
 	// TODO server configuration
 	server := &http.Server{
-		Handler: router.New(hand),
+		Handler: router.New(hlr, au),
 		Addr:    cfg.Port(),
 	}
 

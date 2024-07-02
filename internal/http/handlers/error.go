@@ -1,9 +1,10 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz/internal/app"
-	"net/http"
 )
 
 // ErrResponse represents the error format to respond with.
@@ -20,7 +21,16 @@ func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func errBadRequest(err error) *ErrResponse {
+// ErrUnauthorised returns an error wrapped in a http.StatusUnauthorized.
+func ErrUnauthorised(err error) *ErrResponse {
+	return &ErrResponse{
+		Status: http.StatusUnauthorized,
+		Error:  err.Error(),
+	}
+}
+
+// ErrBadRequest returns an error wrapped in a http.BasRequest.
+func ErrBadRequest(err error) *ErrResponse {
 	return &ErrResponse{
 		Status: http.StatusBadRequest,
 		Error:  err.Error(),
@@ -34,6 +44,8 @@ func convertErr(err app.Error) *ErrResponse {
 		status = http.StatusBadRequest
 	case app.ErrorStatusNotFound:
 		status = http.StatusNotFound
+	case app.ErrorStatusUnauthorised:
+
 	default:
 		status = http.StatusInternalServerError
 	}

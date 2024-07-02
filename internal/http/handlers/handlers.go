@@ -63,7 +63,7 @@ func (h *handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(req)
 	if err != nil {
 		logger.Error(r.Context(), "decoding request", err)
-		err = render.Render(w, r, errBadRequest(err))
+		err = render.Render(w, r, ErrBadRequest(err))
 		logger.MaybeError(r.Context(), renderingErrorMessage, err)
 		return
 	}
@@ -123,7 +123,7 @@ func (h *handlers) Login(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(req)
 	if err != nil {
 		logger.Error(r.Context(), "decoding request", err)
-		err = render.Render(w, r, errBadRequest(err))
+		err = render.Render(w, r, ErrBadRequest(err))
 		logger.MaybeError(r.Context(), renderingErrorMessage, err)
 		return
 	}

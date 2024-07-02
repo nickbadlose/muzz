@@ -3,10 +3,11 @@ package app
 import (
 	"context"
 	"errors"
+
+	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"github.com/nickbadlose/muzz/internal/pkg/logger"
 	"github.com/nickbadlose/muzz/internal/store"
 	"go.uber.org/zap"
-	"time"
 )
 
 type Service interface {
@@ -14,18 +15,12 @@ type Service interface {
 	Login(context.Context, *LoginRequest) (string, Error)
 }
 
-type configuration interface {
-	DomainName() string
-	JWTDuration() time.Duration
-	JWTSecret() string
-}
-
 type service struct {
-	store  store.Store
-	config configuration
+	store store.Store
+	auth  auth.Generator
 }
 
-func NewService(store store.Store, config configuration) Service { return &service{store, config} }
+func NewService(s store.Store, gen auth.Generator) Service { return &service{s, gen} }
 
 // CreateUser takes a users details, validates them and creates a new user record in the database.
 func (s *service) CreateUser(ctx context.Context, req *CreateUserRequest) (*User, Error) {
@@ -90,7 +85,7 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (string, Error) 
 		return "", errUnauthorised(errors.New("incorrect email or password"))
 	}
 
-	token, err := generateJWT(user.ID, s.config)
+	token, err := s.auth.GenerateJWT(user.ID)
 	if err != nil {
 		logger.Error(ctx, "generating token", err)
 		return "", errInternal(err)
