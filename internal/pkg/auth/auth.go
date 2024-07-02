@@ -23,6 +23,10 @@ type config interface {
 type Authorizer interface {
 	Generator
 	Validator
+	UserIDer
+}
+
+type UserIDer interface {
 	UserIDFromContext(ctx context.Context) (int, error)
 }
 
@@ -80,7 +84,7 @@ func (a *authorizer) UserIDFromContext(ctx context.Context) (int, error) {
 func (a *authorizer) ParseJWT(token string) (*jwt.Token, *Claims, error) {
 	claims := &Claims{}
 	tkn, err := jwt.ParseWithClaims(token, claims, func(token *jwt.Token) (interface{}, error) {
-		return a.config.JWTSecret(), nil
+		return []byte(a.config.JWTSecret()), nil
 	})
 	if err != nil {
 		return nil, nil, err

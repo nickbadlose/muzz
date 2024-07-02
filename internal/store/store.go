@@ -4,17 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-
 	"github.com/nickbadlose/muzz/internal/pkg/database"
 )
 
 const (
-	userTable = "User"
+	userTable = "user"
 )
 
 var (
 	// ErrorNotFound represents when a requested record does not exist in the database.
-	ErrorNotFound = errors.New("record not found")
+	ErrorNotFound = errors.New("no records not found")
 )
 
 // TODO see if we can abstract out database layer from leaking into application layer
@@ -25,6 +24,7 @@ var (
 type Store interface {
 	CreateUser(context.Context, *CreateUserInput) (*User, error)
 	GetUserByEmail(context.Context, string) (*User, error)
+	GetUsers(context.Context, int) ([]*UserDetails, error)
 }
 
 type store struct {
@@ -92,8 +92,6 @@ func (s *store) GetUserByEmail(ctx context.Context, email string) (*User, error)
 		return nil, err
 	}
 
-	// TODO check not found?
-
 	user := new(User)
 	err = row.Scan(&user.ID, &user.Email, &user.Password, &user.Name, &user.Gender, &user.Age)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -104,4 +102,44 @@ func (s *store) GetUserByEmail(ctx context.Context, email string) (*User, error)
 	}
 
 	return user, nil
+}
+
+// UserDetails represents a row from the "user" table with only public fields present.
+type UserDetails struct {
+	ID     int
+	Name   string
+	Gender string
+	Age    int
+}
+
+func (s *store) GetUsers(ctx context.Context, userID int) ([]*UserDetails, error) {
+	r, err := s.database.ReadSessionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	columns := []interface{}{"id", "name", "gender", "age"}
+	rows, err := r.SelectFrom(userTable).Columns(columns...).Where("id != ?", userID).QueryContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	users := make([]*UserDetails, 0, 1)
+	for rows.Next() {
+		user := new(UserDetails)
+		err = rows.Scan(&user.ID, &user.Name, &user.Gender, &user.Age)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	if errors.Is(rows.Err(), sql.ErrNoRows) {
+		return nil, ErrorNotFound
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+
+	return users, nil
 }

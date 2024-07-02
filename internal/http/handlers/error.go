@@ -45,7 +45,7 @@ func convertErr(err app.Error) *ErrResponse {
 	case app.ErrorStatusNotFound:
 		status = http.StatusNotFound
 	case app.ErrorStatusUnauthorised:
-
+		status = http.StatusUnauthorized
 	default:
 		status = http.StatusInternalServerError
 	}

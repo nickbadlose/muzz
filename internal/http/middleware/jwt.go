@@ -23,7 +23,16 @@ func Authorization(validator auth.Validator) func(next http.Handler) http.Handle
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			bearerToken := r.Header.Get(authorizationHeader)
-			reqToken := strings.Split(bearerToken, " ")[1]
+			splitBearer := strings.Split(bearerToken, " ")
+			if len(splitBearer) != 2 {
+				logger.MaybeError(
+					r.Context(),
+					renderingErrorMessage,
+					render.Render(w, r, handlers.ErrUnauthorised(errors.New("no authorisation provided"))),
+				)
+				return
+			}
+			reqToken := splitBearer[1]
 			token, claims, err := validator.ParseJWT(reqToken)
 			if err != nil {
 				if errors.Is(err, jwt.ErrSignatureInvalid) {

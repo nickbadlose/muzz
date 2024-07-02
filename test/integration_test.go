@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/nickbadlose/muzz/config"
-	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,59 +18,102 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/app"
 	"github.com/nickbadlose/muzz/internal/http/handlers"
 	"github.com/nickbadlose/muzz/internal/http/router"
+	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"github.com/nickbadlose/muzz/internal/pkg/database"
 	"github.com/nickbadlose/muzz/internal/store"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+func newTestServer(t *testing.T) *httptest.Server {
+	db := setupDB(t)
+	str := store.New(db)
+	cfg := config.Load()
+	au := auth.NewAuthoriser(cfg)
+	svc := app.NewService(str, au)
+	h := handlers.NewHandlers(svc, au)
+
+	srv := httptest.NewServer(router.New(h, au))
+	t.Cleanup(srv.Close)
+
+	return srv
+}
+
 func setupDB(t *testing.T) database.Database {
-	// test migrator to set up and teardown test db.
-	testM, err := migrate.New(
-		"file://./migrations",
-		"postgres://nick:password@localhost:5432/postgres?sslmode=disable",
+	// TODO don't continue on errorNoChange, it means some migrations haven't run correctly?
+
+	// TODO auth from cfg
+	// create test DB migrator to set up and teardown test db.
+	// You can't drop a database whilst connections still exist, so we authenticate to the postgres DB to run these.
+	createTestDBMigrator, err := migrate.New(
+		"file://./migrations/create",
+		"postgres://nickbadlose:password@localhost:5432/postgres?sslmode=disable",
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		err = testM.Down()
+		err = createTestDBMigrator.Down()
 		if !errors.Is(err, migrate.ErrNoChange) {
 			require.NoError(t, err)
 		}
-		sErr, dErr := testM.Close()
+		sErr, dErr := createTestDBMigrator.Close()
 		require.NoError(t, sErr)
 		require.NoError(t, dErr)
 	})
 
-	err = testM.Up()
+	err = createTestDBMigrator.Up()
 	if !errors.Is(err, migrate.ErrNoChange) {
 		require.NoError(t, err)
 	}
 
-	// TODO run appM.Drop at the start of each migration to clear all data if db already existed
-	// app migrator to run application migrations.
-	appM, err := migrate.New(
+	// TODO get auth from env
+	// TODO run appMigrator.Drop at the start of each migration to clear all data if db already existed
+	// app migrator to run all application migrations.
+	appMigrator, err := migrate.New(
 		"file://../migrations",
-		"postgres://nick:password@localhost:5432/test?sslmode=disable",
+		"postgres://nickbadlose:password@localhost:5432/test?sslmode=disable",
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		err = appM.Down()
+		err = appMigrator.Down()
 		require.NoError(t, err)
-		sErr, dErr := appM.Close()
+		sErr, dErr := appMigrator.Close()
 		require.NoError(t, sErr)
 		require.NoError(t, dErr)
 	})
 
-	err = appM.Up()
+	err = appMigrator.Up()
 	if !errors.Is(err, migrate.ErrNoChange) {
 		require.NoError(t, err)
 	}
 
+	// seed migrator seeds any test data into the database. Golang-migrate requires multiple schema tables to run
+	// multiple separate migration folders against the same DB, so we specify a seed schema table for these,
+	// &x-migrations-table=\"schema_seed_migrations\".
+	// https://github.com/golang-migrate/migrate/issues/395#issuecomment-867133636
+	seedMigrator, err := migrate.New(
+		"file://./migrations/seed",
+		"postgres://nickbadlose:password@localhost:5432/test?sslmode=disable&x-migrations-table=\"schema_seed_migrations\"",
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		err = seedMigrator.Down()
+		require.NoError(t, err)
+		sErr, dErr := seedMigrator.Close()
+		require.NoError(t, sErr)
+		require.NoError(t, dErr)
+	})
+
+	err = seedMigrator.Up()
+	if !errors.Is(err, migrate.ErrNoChange) {
+		require.NoError(t, err)
+	}
+
+	// TODO auth from cfg
 	db, err := database.New(context.Background(), &database.Config{
-		Username: "nick",
+		Username: "nickbadlose",
 		Password: "password",
 		Name:     "test",
 		Host:     "localhost:5432",
@@ -87,11 +128,10 @@ func setupDB(t *testing.T) database.Database {
 
 // TODO don't test login here as it will be tested by logging in to call authenticated routes
 
-func TestSuccess(t *testing.T) {
+func TestPublic(t *testing.T) {
 	cases := []struct {
 		endpoint, method string
 		body             interface{}
-		res              interface{}
 		expectedCode     int
 	}{
 		{endpoint: "status", method: http.MethodGet, expectedCode: http.StatusOK},
@@ -99,7 +139,7 @@ func TestSuccess(t *testing.T) {
 			endpoint: "user/create",
 			method:   http.MethodPost,
 			body: &handlers.CreateUserRequest{
-				Email:    "test@test.com",
+				Email:    "test6@test.com",
 				Password: "Pa55w0rd!",
 				Name:     "test",
 				Gender:   "female",
@@ -110,19 +150,10 @@ func TestSuccess(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		t.Run(tc.endpoint, func(t *testing.T) {
-			db := setupDB(t)
-			str := store.New(db)
-			cfg := config.Load()
-			au := auth.NewAuthoriser(cfg)
-			svc := app.NewService(str, au)
-			h := handlers.NewHandlers(svc)
-
-			srv := httptest.NewServer(router.New(h, au))
-			t.Cleanup(srv.Close)
+		t.Run(fmt.Sprintf("%s/%s", tc.method, tc.endpoint), func(t *testing.T) {
+			srv := newTestServer(t)
 
 			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), tc.body)
-			require.Equal(t, tc.expectedCode, resp.StatusCode)
 
 			testDir := getTestDataDirectory()
 			expected, err := os.ReadFile(filepath.Join(
@@ -135,7 +166,68 @@ func TestSuccess(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, resp.Body.Close())
 
-			assert.JSONEq(t, string(expected), string(got))
+			require.JSONEq(t, string(expected), string(got))
+			require.Equal(t, tc.expectedCode, resp.StatusCode)
+		})
+	}
+}
+
+func TestAuthenticated(t *testing.T) {
+	cases := []struct {
+		endpoint, method string
+		body             interface{}
+		expectedCode     int
+	}{
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			expectedCode: http.StatusOK,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s/%s", tc.method, tc.endpoint), func(t *testing.T) {
+			srv := newTestServer(t)
+
+			loginData := makeRequest(
+				t,
+				http.MethodPost,
+				fmt.Sprintf("%s/%s", srv.URL, "login"),
+				&handlers.LoginRequest{
+					Email:    "test@test.com",
+					Password: "Pa55w0rd!",
+				},
+			)
+
+			loginRes := &handlers.LoginResponse{}
+			err := json.NewDecoder(loginData.Body).Decode(loginRes)
+			require.NoError(t, err)
+			require.NotEmpty(t, loginRes.Token)
+
+			resp := makeRequest(
+				t,
+				tc.method,
+				fmt.Sprintf("%s/%s", srv.URL, tc.endpoint),
+				tc.body,
+				&header{
+					key:   "Authorization",
+					value: fmt.Sprintf("Bearer %s", loginRes.Token),
+				},
+			)
+
+			testDir := getTestDataDirectory()
+			expected, err := os.ReadFile(filepath.Join(
+				testDir,
+				strings.ReplaceAll(fmt.Sprintf("%s.%s.json", tc.endpoint, tc.method), "/", "."),
+			))
+			require.NoError(t, err)
+
+			got, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+
+			require.JSONEq(t, string(expected), string(got))
+			require.Equal(t, tc.expectedCode, resp.StatusCode)
 		})
 	}
 }
@@ -145,7 +237,12 @@ func getTestDataDirectory() string {
 	return filepath.Join(filepath.Dir(f), "data")
 }
 
-func makeRequest(t *testing.T, method string, path string, data interface{}) *http.Response {
+type header struct {
+	key   string
+	value string
+}
+
+func makeRequest(t *testing.T, method, url string, data interface{}, headers ...*header) *http.Response {
 	var body []byte
 
 	if data != nil {
@@ -154,9 +251,12 @@ func makeRequest(t *testing.T, method string, path string, data interface{}) *ht
 		require.NoError(t, err)
 	}
 
-	req, err := http.NewRequest(method, path, bytes.NewBuffer(body))
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
 	require.NoError(t, err)
 	req.Header.Set("Content-Type", "application/json")
+	for _, h := range headers {
+		req.Header.Set(h.key, h.value)
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)

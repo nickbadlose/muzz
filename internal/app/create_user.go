@@ -76,7 +76,7 @@ func (g *Gender) UnmarshalJSON(bytes []byte) error {
 // MarshalJSON implements the json.Unmarshaler interface.
 func (g *Gender) MarshalJSON() ([]byte, error) { return json.Marshal(g.String()) }
 
-// User details.
+// User contains all a users stored details.
 type User struct {
 	ID       int
 	Email    string

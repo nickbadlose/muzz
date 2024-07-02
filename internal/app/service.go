@@ -13,6 +13,7 @@ import (
 type Service interface {
 	CreateUser(context.Context, *CreateUserRequest) (*User, Error)
 	Login(context.Context, *LoginRequest) (string, Error)
+	GetUsers(context.Context, int) ([]*UserDetails, Error)
 }
 
 type service struct {
@@ -92,4 +93,36 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (string, Error) 
 	}
 
 	return token, nil
+}
+
+// TODO pagination ? Check specs
+
+func (s *service) GetUsers(ctx context.Context, userID int) ([]*UserDetails, Error) {
+	if userID == 0 {
+		err := errBadRequest(errors.New("user id is required"))
+		logger.Error(ctx, "no user id supplied", err)
+		return nil, err
+	}
+
+	storeUsers, err := s.store.GetUsers(ctx, userID)
+	if err != nil {
+		logger.Error(ctx, "getting users from database", err)
+		return nil, errInternal(err)
+	}
+
+	users := make([]*UserDetails, 0, len(storeUsers))
+	for _, user := range storeUsers {
+		gender, ok := GenderValues[user.Gender]
+		if !ok {
+			logger.Error(
+				ctx,
+				"invalid gender returned from database",
+				errors.New("invalid gender"),
+				zap.String("gender", gender.String()),
+			)
+		}
+		users = append(users, &UserDetails{ID: user.ID, Name: user.Name, Gender: gender, Age: user.Age})
+	}
+
+	return users, nil
 }

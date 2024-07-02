@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS public."User" (
+CREATE TABLE IF NOT EXISTS public.user (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL,
     password TEXT NOT NULL,

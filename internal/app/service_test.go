@@ -3,16 +3,16 @@ package app
 import (
 	"context"
 	"errors"
-	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/nickbadlose/muzz/config"
+	"github.com/nickbadlose/muzz/internal/pkg/auth"
 	"github.com/nickbadlose/muzz/internal/store"
 	mockstore "github.com/nickbadlose/muzz/internal/store/mocks"
 	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestService(m *mockstore.Store) Service {
@@ -23,7 +23,7 @@ func newTestService(m *mockstore.Store) Service {
 
 func TestNewService(t *testing.T) {
 	svc := newTestService(&mockstore.Store{})
-	assert.NotNil(t, svc)
+	require.NotNil(t, svc)
 }
 
 func TestService_CreateUser(t *testing.T) {
@@ -56,10 +56,10 @@ func TestService_CreateUser(t *testing.T) {
 			Gender:   "male",
 			Age:      25,
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.NotNil(t, got)
-		assert.Equal(t, got, &User{
+		require.NotNil(t, got)
+		require.Equal(t, got, &User{
 			ID:       1,
 			Email:    "test@test.com",
 			Password: "Pa55w0rd!",
@@ -161,9 +161,9 @@ func TestService_CreateUser(t *testing.T) {
 			sut := newTestService(&mockstore.Store{})
 
 			got, err := sut.CreateUser(context.Background(), tc.req)
-			assert.Nil(t, got)
-			assert.Equal(t, err.Status(), ErrorStatusBadRequest)
-			assert.Contains(t, err.Error(), tc.errMessage)
+			require.Nil(t, got)
+			require.Contains(t, err.Error(), tc.errMessage)
+			require.Equal(t, err.Status(), ErrorStatusBadRequest)
 		})
 	}
 
@@ -196,18 +196,20 @@ func TestService_CreateUser(t *testing.T) {
 			sut := newTestService(m)
 
 			got, err := sut.CreateUser(context.Background(), tc.req)
-			assert.Nil(t, got)
-			assert.Equal(t, err.Status(), ErrorStatusInternal)
-			assert.Contains(t, err.Error(), tc.errMessage)
+			require.Nil(t, got)
+			require.Contains(t, err.Error(), tc.errMessage)
+			require.Equal(t, err.Status(), ErrorStatusInternal)
 		})
 	}
 }
 
-func TestService_Login(t *testing.T) {
+func init() {
 	viper.Set("DOMAIN_NAME", "https://test.com")
 	viper.Set("JWT_DURATION", "12h")
 	viper.Set("JWT_SECRET", "test")
+}
 
+func TestService_Login(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		m := mockstore.NewStore(t)
 		sut := newTestService(m)
@@ -227,17 +229,17 @@ func TestService_Login(t *testing.T) {
 		// TODO test claims in auth package, noot here.
 
 		got, err := sut.Login(context.Background(), &LoginRequest{Email: "test@test.com", Password: "Pa55w0rd!"})
-		assert.NoError(t, err)
-		assert.NotEmpty(t, got)
+		require.NoError(t, err)
+		require.NotEmpty(t, got)
 		claims := &auth.Claims{}
 		tkn, pErr := jwt.ParseWithClaims(got, claims, func(token *jwt.Token) (interface{}, error) {
 			return []byte("test"), nil
 		})
-		assert.NoError(t, pErr)
-		assert.Equal(t, 1, claims.UserID)
-		assert.Equal(t, "https://test.com", claims.Issuer)
-		assert.Equal(t, jwt.ClaimStrings{"https://test.com"}, claims.Audience)
-		assert.True(t, tkn.Valid)
+		require.NoError(t, pErr)
+		require.Equal(t, 1, claims.UserID)
+		require.Equal(t, "https://test.com", claims.Issuer)
+		require.Equal(t, jwt.ClaimStrings{"https://test.com"}, claims.Audience)
+		require.True(t, tkn.Valid)
 	})
 
 	validationCases := []struct {
@@ -262,9 +264,9 @@ func TestService_Login(t *testing.T) {
 			sut := newTestService(&mockstore.Store{})
 
 			got, err := sut.Login(context.Background(), tc.req)
-			assert.Empty(t, got)
-			assert.Equal(t, err.Status(), ErrorStatusBadRequest)
-			assert.Contains(t, err.Error(), tc.errMessage)
+			require.Empty(t, got)
+			require.Contains(t, err.Error(), tc.errMessage)
+			require.Equal(t, err.Status(), ErrorStatusBadRequest)
 		})
 	}
 
@@ -321,9 +323,106 @@ func TestService_Login(t *testing.T) {
 			sut := newTestService(m)
 
 			got, err := sut.Login(context.Background(), tc.req)
-			assert.Empty(t, got)
-			assert.Equal(t, err.Status(), tc.errStatus)
-			assert.Contains(t, err.Error(), tc.errMessage)
+			require.Empty(t, got)
+			require.Contains(t, err.Error(), tc.errMessage)
+			require.Equal(t, err.Status(), tc.errStatus)
+		})
+	}
+}
+
+func TestService_Discover(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		m := mockstore.NewStore(t)
+
+		m.EXPECT().
+			GetUsers(mock.Anything, 1).Once().Return(
+			[]*store.UserDetails{
+				{
+					ID:     2,
+					Name:   "test",
+					Gender: "female",
+					Age:    25,
+				},
+				{
+					ID:     3,
+					Name:   "test",
+					Gender: "unknown gender",
+					Age:    25,
+				},
+			},
+			nil,
+		)
+
+		sut := newTestService(m)
+
+		got, err := sut.GetUsers(context.Background(), 1)
+		require.NoError(t, err)
+		require.Equal(t, []*UserDetails{
+			{
+				ID:     2,
+				Name:   "test",
+				Gender: GenderFemale,
+				Age:    25,
+			},
+			{
+				ID:     3,
+				Name:   "test",
+				Gender: GenderUndefined,
+				Age:    25,
+			},
+		}, got)
+	})
+
+	validationCases := []struct {
+		name       string
+		req        int
+		errMessage string
+	}{
+		{
+			name:       "empty id",
+			req:        0,
+			errMessage: "user id is required",
+		},
+	}
+
+	for _, tc := range validationCases {
+		t.Run(tc.name, func(t *testing.T) {
+			sut := newTestService(&mockstore.Store{})
+
+			got, err := sut.GetUsers(context.Background(), tc.req)
+			require.Empty(t, got)
+			require.Contains(t, err.Error(), tc.errMessage)
+			require.Equal(t, err.Status(), ErrorStatusBadRequest)
+		})
+	}
+
+	errCases := []struct {
+		name           string
+		setupMockStore func(*mockstore.Store)
+		errMessage     string
+		errStatus      ErrorStatus
+	}{
+		{
+			name: "error from store",
+			setupMockStore: func(m *mockstore.Store) {
+				m.EXPECT().GetUsers(mock.Anything, 1).
+					Once().Return(nil, errors.New("database error"))
+			},
+			errMessage: "database error",
+			errStatus:  ErrorStatusInternal,
+		},
+	}
+
+	for _, tc := range errCases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := mockstore.NewStore(t)
+			tc.setupMockStore(m)
+			sut := newTestService(m)
+
+			got, err := sut.GetUsers(context.Background(), 1)
+			require.Empty(t, got)
+			require.Contains(t, err.Error(), tc.errMessage)
+			require.Equal(t, err.Status(), tc.errStatus)
 		})
 	}
 }

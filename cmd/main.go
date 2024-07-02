@@ -52,7 +52,7 @@ func main() {
 	str := store.New(db)
 	au := auth.NewAuthoriser(cfg)
 	svc := app.NewService(str, au)
-	hlr := handlers.NewHandlers(svc)
+	hlr := handlers.NewHandlers(svc, au)
 
 	// TODO server configuration
 	server := &http.Server{
@@ -71,6 +71,7 @@ func main() {
 	<-sig
 	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, idleTimeout)
 	defer timeoutCancel()
+	// TODO close all service connections after graceful shutdown, logger last
 	err = server.Shutdown(timeoutCtx)
 	if err != nil {
 		log.Fatalf("shutting down server: %s", err)

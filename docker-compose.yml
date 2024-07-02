@@ -4,7 +4,6 @@ services:
   api:
     container_name: api
     restart: always
-    env_file: development.env
     environment:
       PORT: ${PORT}
       DATABASE_USER: ${DATABASE_USER}
@@ -28,7 +27,6 @@ services:
     container_name: postgres
     image: postgres:16.3
     restart: always
-    env_file: development.env
     environment:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}

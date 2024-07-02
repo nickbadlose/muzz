@@ -41,7 +41,7 @@ func New(h handlers.Handlers, v auth.Validator) http.Handler {
 	// Private routes
 	r.Group(func(r chi.Router) {
 		r.Use(middlewareInternal.Authorization(v))
-		//r.Post("/manage", CreateAsset)
+		r.Get("/discover", h.Discover)
 	})
 
 	return r
