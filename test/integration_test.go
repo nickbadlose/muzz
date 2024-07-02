@@ -84,6 +84,8 @@ func setupDB(t *testing.T) database.Database {
 	return db
 }
 
+// TODO don't test login here as it will be tested by logging in to call authenticated routes
+
 func TestSuccess(t *testing.T) {
 	cases := []struct {
 		endpoint, method string

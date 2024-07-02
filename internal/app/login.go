@@ -24,8 +24,6 @@ func (req *LoginRequest) Validate() error {
 	return nil
 }
 
-var tokens []string
-
 // Claims to store in the JWT.
 type Claims struct {
 	ID int `json:"id"`

@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 
 	"github.com/nickbadlose/muzz/internal/pkg/database"
@@ -95,6 +96,9 @@ func (s *store) GetUserByEmail(ctx context.Context, email string) (*User, error)
 
 	user := new(User)
 	err = row.Scan(&user.ID, &user.Email, &user.Password, &user.Name, &user.Gender, &user.Age)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrorNotFound
+	}
 	if err != nil {
 		return nil, err
 	}

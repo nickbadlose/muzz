@@ -74,9 +74,10 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (string, Error) 
 		return "", errBadRequest(err)
 	}
 
-	// TODO check if user did not exist in db
-
 	user, err := s.store.GetUserByEmail(ctx, req.Email)
+	if errors.Is(err, store.ErrorNotFound) {
+		return "", errUnauthorised(errors.New("incorrect email or password"))
+	}
 	if err != nil {
 		logger.Error(ctx, "getting user from database", err)
 		return "", errInternal(err)
