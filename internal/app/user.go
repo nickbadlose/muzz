@@ -4,13 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"net/mail"
 	"regexp"
 	"strings"
 	"unicode"
-
-	"github.com/go-chi/render"
 )
 
 // TODO
@@ -26,11 +23,11 @@ const (
 type Gender uint8
 
 const (
-	// GenderUnspecified for when no gender is provided. this is an invalid gender.
-	GenderUnspecified Gender = iota
+	// GenderUndefined for when no gender is provided, this is an invalid gender.
+	GenderUndefined Gender = iota
 	// GenderMale represents the "male" gender option.
 	GenderMale
-	// GenderFemale represents the female gender option.
+	// GenderFemale represents the "female" gender option.
 	GenderFemale
 )
 
@@ -49,14 +46,12 @@ var (
 
 // String returns a lower-case representation of the Gender.
 func (g *Gender) String() string {
-	switch *g {
-	case GenderMale:
-		return "male"
-	case GenderFemale:
-		return "female"
-	default:
-		return fmt.Sprintf("Gender(%d)", g)
+	gender, ok := GenderNames[*g]
+	if !ok {
+		return fmt.Sprintf("Gender(%d)", *g)
 	}
+
+	return gender
 }
 
 // Valid validates the Gender against the accepted values.
@@ -73,11 +68,7 @@ func (g *Gender) UnmarshalJSON(bytes []byte) error {
 		return err
 	}
 
-	gen, ok := GenderValues[gString]
-	if !ok {
-		return fmt.Errorf("unknown gender %s", gString)
-	}
-
+	gen := GenderValues[gString]
 	*g = gen
 	return nil
 }
@@ -87,35 +78,25 @@ func (g *Gender) MarshalJSON() ([]byte, error) { return json.Marshal(g.String())
 
 // User details.
 type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Gender   Gender `json:"gender"`
-	Age      int    `json:"age"`
+	ID       int
+	Email    string
+	Password string
+	Name     string
+	Gender   Gender
+	Age      int
 }
 
-// UserResponse object to send to the client.
-type UserResponse struct {
-	Result *User `json:"result"`
-}
-
-// Render implements the render.Render interface.
-func (u *UserResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	render.Status(r, http.StatusCreated)
-	return nil
-}
-
-// CreateUserRequest holds the accepted request format to create a user.
+// CreateUserRequest is the accepted request to create a user.
 type CreateUserRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Gender   Gender `json:"gender"`
-	Age      int    `json:"age"`
+	Email    string
+	Password string
+	Name     string
+	Gender   string
+	Age      int
 }
 
-func (req *CreateUserRequest) validate() error {
+// Validate the CreateUserRequest fields.
+func (req *CreateUserRequest) Validate() error {
 	if req.Email == "" {
 		return errors.New("email is a required field")
 	}
@@ -138,7 +119,8 @@ func (req *CreateUserRequest) validate() error {
 		return errors.New("name is a required field")
 	}
 
-	if !req.Gender.Valid() {
+	gender := GenderValues[req.Gender]
+	if !gender.Valid() {
 		genders := make([]string, 0, len(GenderValues))
 		for name := range GenderValues {
 			genders = append(genders, name)

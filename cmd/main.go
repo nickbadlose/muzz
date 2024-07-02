@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/nickbadlose/muzz/internal/http/handlers"
+	"github.com/nickbadlose/muzz/internal/http/router"
 	"github.com/nickbadlose/muzz/internal/store"
 	"log"
 	"net/http"
@@ -10,12 +12,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/app"
 	"github.com/nickbadlose/muzz/internal/pkg/database"
 	"github.com/nickbadlose/muzz/internal/pkg/logger"
-	"github.com/nickbadlose/muzz/router"
 )
 
 const (
@@ -24,17 +24,12 @@ const (
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("loading .env file: %s", err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	cfg := config.MustLoad()
 
-	err = logger.New(logger.WithLogLevelString(cfg.LogLevel))
+	err := logger.New(logger.WithLogLevelString(cfg.LogLevel()))
 	if err != nil {
 		log.Fatalf("failed to initialize logger: %s", err)
 	}
@@ -43,10 +38,10 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
 	db, err := database.New(ctx, &database.Config{
-		Username:     cfg.DatabaseUser,
-		Password:     cfg.DatabasePassword,
-		Name:         cfg.Database,
-		Host:         cfg.DatabaseHost,
+		Username:     cfg.DatabaseUser(),
+		Password:     cfg.DatabasePassword(),
+		Name:         cfg.Database(),
+		Host:         cfg.DatabaseHost(),
 		DebugEnabled: false,
 	})
 	if err != nil {
@@ -54,17 +49,17 @@ func main() {
 	}
 
 	storage := store.New(db)
-	service := app.NewService(storage)
-	handlers := app.NewHandlers(service)
+	service := app.NewService(storage, cfg)
+	hand := handlers.NewHandlers(service)
 
 	// TODO server configuration
 	server := &http.Server{
-		Handler: router.New(handlers),
-		Addr:    cfg.Port,
+		Handler: router.New(hand),
+		Addr:    cfg.Port(),
 	}
 
 	go func() {
-		log.Printf("listening on port: %v\n", cfg.Port)
+		log.Printf("listening on port: %v\n", cfg.Port())
 		sErr := server.ListenAndServe()
 		if sErr != nil {
 			log.Fatalf("starting server: %s", sErr)

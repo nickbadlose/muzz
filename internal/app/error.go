@@ -1,41 +1,60 @@
 package app
 
-import (
-	"github.com/go-chi/render"
-	"net/http"
+type ErrorStatus uint8
+
+const (
+	// ErrorStatusBadRequest states an issue with the request.
+	ErrorStatusBadRequest ErrorStatus = iota
+	// ErrorStatusNotFound states that the requested resource could not be found.
+	ErrorStatusNotFound
+	// ErrorStatusInternal states an internal server issue.
+	ErrorStatusInternal
+	// ErrorStatusUnauthorised states a request was unauthorised.
+	ErrorStatusUnauthorised
 )
 
-// ErrResponse represents the error format to respond with.
-type ErrResponse struct {
-	// Status is the http status code to respond with.
-	Status int `json:"status"`
-	// Error represents the error message to respond with.
-	Error string `json:"error"`
+type Error interface {
+	Status() ErrorStatus
+	Error() string
 }
 
-// Render implements the render.Render interface.
-func (e *ErrResponse) Render(w http.ResponseWriter, r *http.Request) error {
-	render.Status(r, e.Status)
-	return nil
+type applicationError struct {
+	status ErrorStatus
+	error  error
 }
 
-func errInternal(err error) *ErrResponse {
-	return &ErrResponse{
-		Status: http.StatusInternalServerError,
-		Error:  err.Error(),
+func (e *applicationError) Status() ErrorStatus { return e.status }
+func (e *applicationError) Error() string {
+	if e.error == nil {
+		return ""
+	}
+	return e.error.Error()
+}
+
+func errBadRequest(err error) Error {
+	return &applicationError{
+		status: ErrorStatusBadRequest,
+		error:  err,
 	}
 }
 
-func errBadRequest(err error) *ErrResponse {
-	return &ErrResponse{
-		Status: http.StatusBadRequest,
-		Error:  err.Error(),
+func errInternal(err error) Error {
+	return &applicationError{
+		status: ErrorStatusInternal,
+		error:  err,
 	}
 }
 
-func newErr(status int, err error) *ErrResponse {
-	return &ErrResponse{
-		Status: status,
-		Error:  err.Error(),
+func errUnauthorised(err error) Error {
+	return &applicationError{
+		status: ErrorStatusUnauthorised,
+		error:  err,
+	}
+}
+
+func newErr(status ErrorStatus, err error) Error {
+	return &applicationError{
+		status: status,
+		error:  err,
 	}
 }

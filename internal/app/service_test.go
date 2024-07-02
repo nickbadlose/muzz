@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/store"
 	mockstore "github.com/nickbadlose/muzz/internal/store/mocks"
 	"github.com/stretchr/testify/assert"
@@ -12,14 +13,14 @@ import (
 )
 
 func TestNewService(t *testing.T) {
-	svc := NewService(mockstore.NewStore(t))
+	svc := NewService(mockstore.NewStore(t), config.Load())
 	assert.NotNil(t, svc)
 }
 
 func TestService_CreateUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		m := mockstore.NewStore(t)
-		sut := NewService(m)
+		sut := NewService(m, config.Load())
 
 		m.EXPECT().
 			CreateUser(mock.Anything, &store.CreateUserInput{
@@ -43,7 +44,7 @@ func TestService_CreateUser(t *testing.T) {
 			Email:    "test@test.com",
 			Password: "Pa55w0rd!",
 			Name:     "test",
-			Gender:   GenderMale,
+			Gender:   "male",
 			Age:      25,
 		})
 		assert.NoError(t, err)
@@ -131,24 +132,24 @@ func TestService_CreateUser(t *testing.T) {
 		},
 		{
 			name:       "invalid gender: out of range int",
-			req:        &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: Gender(100)},
+			req:        &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: "not a valid gender"},
 			errMessage: "please provide a valid gender from",
 		},
 		{
 			name:       "missing age",
-			req:        &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: GenderMale, Age: 0},
+			req:        &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: "male", Age: 0},
 			errMessage: "the minimum age is 18",
 		},
 		{
 			name:       "invalid age: too low",
-			req:        &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: GenderMale, Age: 17},
+			req:        &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: "male", Age: 17},
 			errMessage: "the minimum age is 18",
 		},
 	}
 
 	for _, tc := range validationCases {
 		t.Run(tc.name, func(t *testing.T) {
-			sut := NewService(mockstore.NewStore(t))
+			sut := NewService(mockstore.NewStore(t), config.Load())
 
 			got, err := sut.CreateUser(context.Background(), tc.req)
 			assert.Nil(t, got)
@@ -164,7 +165,7 @@ func TestService_CreateUser(t *testing.T) {
 	}{
 		{
 			name: "error from store",
-			req:  &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "test", Gender: GenderFemale, Age: 25},
+			req:  &CreateUserRequest{Email: "test@test.com", Password: "Pa55w0rd!", Name: "test", Gender: "female", Age: 25},
 			setupMockStore: func(m *mockstore.Store) {
 				m.EXPECT().CreateUser(mock.Anything, &store.CreateUserInput{
 					Email:    "test@test.com",
@@ -182,7 +183,7 @@ func TestService_CreateUser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockstore.NewStore(t)
 			tc.setupMockStore(m)
-			sut := NewService(m)
+			sut := NewService(m, config.Load())
 
 			got, err := sut.CreateUser(context.Background(), tc.req)
 			assert.Nil(t, got)

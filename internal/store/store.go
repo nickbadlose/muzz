@@ -2,8 +2,18 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"github.com/nickbadlose/muzz/internal/pkg/database"
+)
+
+const (
+	userTable = "User"
+)
+
+var (
+	// ErrorNotFound represents when a requested record does not exist in the database.
+	ErrorNotFound = errors.New("record not found")
 )
 
 // TODO see if we can abstract out database layer from leaking into application layer
@@ -13,6 +23,7 @@ import (
 // Store is the interface to write and read data from the database.
 type Store interface {
 	CreateUser(context.Context, *CreateUserInput) (*User, error)
+	GetUserByEmail(context.Context, string) (*User, error)
 }
 
 type store struct {
@@ -49,7 +60,7 @@ func (s *store) CreateUser(ctx context.Context, req *CreateUserInput) (*User, er
 	}
 
 	columns := []string{"id", "email", "password", "name", "gender", "age"}
-	row, err := w.InsertInto("User").
+	row, err := w.InsertInto(userTable).
 		Columns(columns[1:]...).
 		Values(req.Email, req.Password, req.Name, req.Gender, req.Age).
 		Returning(columns...).
@@ -58,11 +69,35 @@ func (s *store) CreateUser(ctx context.Context, req *CreateUserInput) (*User, er
 		return nil, err
 	}
 
-	res := new(User)
-	err = row.Scan(&res.ID, &res.Email, &res.Password, &res.Name, &res.Gender, &res.Age)
+	user := new(User)
+	err = row.Scan(&user.ID, &user.Email, &user.Password, &user.Name, &user.Gender, &user.Age)
 	if err != nil {
 		return nil, err
 	}
 
-	return res, nil
+	return user, nil
+}
+
+func (s *store) GetUserByEmail(ctx context.Context, email string) (*User, error) {
+	r, err := s.database.ReadSessionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO index searching by email
+	columns := []interface{}{"id", "email", "password", "name", "gender", "age"}
+	row, err := r.SelectFrom(userTable).Columns(columns...).Where("email = ?", email).QueryRowContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO check not found?
+
+	user := new(User)
+	err = row.Scan(&user.ID, &user.Email, &user.Password, &user.Name, &user.Gender, &user.Age)
+	if err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }

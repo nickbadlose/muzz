@@ -1,15 +1,15 @@
 package router
 
 import (
-	"github.com/nickbadlose/muzz/internal/app"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
+	"github.com/nickbadlose/muzz/internal/http/handlers"
 )
 
-func New(h app.Handlers) http.Handler {
+func New(h handlers.Handlers) http.Handler {
 	r := chi.NewRouter()
 
 	// TODO
@@ -31,6 +31,7 @@ func New(h app.Handlers) http.Handler {
 	})
 
 	r.Post("/user/create", h.CreateUser)
+	r.Post("/login", h.Login)
 
 	return r
 }

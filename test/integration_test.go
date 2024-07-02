@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/nickbadlose/muzz/internal/store"
+	"github.com/nickbadlose/muzz/config"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -20,8 +20,10 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/nickbadlose/muzz/internal/app"
+	"github.com/nickbadlose/muzz/internal/http/handlers"
+	"github.com/nickbadlose/muzz/internal/http/router"
 	"github.com/nickbadlose/muzz/internal/pkg/database"
-	"github.com/nickbadlose/muzz/router"
+	"github.com/nickbadlose/muzz/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -93,11 +95,11 @@ func TestSuccess(t *testing.T) {
 		{
 			endpoint: "user/create",
 			method:   http.MethodPost,
-			body: &app.CreateUserRequest{
+			body: &handlers.CreateUserRequest{
 				Email:    "test@test.com",
 				Password: "Pa55w0rd!",
 				Name:     "test",
-				Gender:   app.GenderFemale,
+				Gender:   "female",
 				Age:      25,
 			},
 			expectedCode: http.StatusCreated,
@@ -107,11 +109,11 @@ func TestSuccess(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.endpoint, func(t *testing.T) {
 			db := setupDB(t)
-			storage := store.New(db)
-			service := app.NewService(storage)
-			handlers := app.NewHandlers(service)
+			str := store.New(db)
+			svc := app.NewService(str, config.Load())
+			h := handlers.NewHandlers(svc)
 
-			srv := httptest.NewServer(router.New(handlers))
+			srv := httptest.NewServer(router.New(h))
 			t.Cleanup(srv.Close)
 
 			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), tc.body)
