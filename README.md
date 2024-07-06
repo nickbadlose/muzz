@@ -1,6 +1,9 @@
 # muzz
 Muzz tech test
 
+## TODO
+- makefile for docker up / restart db and clear data. Migrations should be ran in these too
+
 ## Postman
 
 [Postman collection](https://www.postman.com/nickbadlose/workspace/muzz-api/collection/13188383-3d2cd57a-d0c4-43bb-ad64-0333f8a67deb?action=share&creator=13188383)

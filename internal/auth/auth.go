@@ -131,7 +131,7 @@ func (a *Authorizer) validateClaims(c *Claims) error {
 func (*Authorizer) UserFromContext(ctx context.Context) (int, error) {
 	uID, ok := ctx.Value(UserKey).(int)
 	if !ok {
-		return 0, errors.New("could not find user")
+		return 0, errors.New("authenticated user not on context")
 	}
 
 	return uID, nil

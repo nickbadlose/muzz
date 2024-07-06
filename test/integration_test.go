@@ -28,6 +28,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TODO
+//  - have migrations_test.go file in here which test constraints etc.
+
 func newTestServer(t *testing.T) *httptest.Server {
 	db := setupDB(t)
 	cfg := config.Load()
@@ -101,10 +104,11 @@ func setupDB(t *testing.T) *database.Database {
 	// https://github.com/golang-migrate/migrate/issues/395#issuecomment-867133636
 	seedMigrator, err := migrate.New(
 		"file://./migrations/seed",
-		"postgres://nickbadlose:password@localhost:5432/test?sslmode=disable&x-migrations-table=\"schema_seed_migrations\"",
+		"postgres://nickbadlose:password@localhost:5432/test?sslmode=disable&x-migrations-table=schema_seed_migrations",
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
+		fmt.Println("seedMigrator.Down()")
 		err = seedMigrator.Down()
 		require.NoError(t, err)
 		sErr, dErr := seedMigrator.Close()
@@ -180,24 +184,40 @@ func TestPublic(t *testing.T) {
 
 func TestAuthenticated(t *testing.T) {
 	cases := []struct {
-		endpoint, method string
-		body             interface{}
-		expectedCode     int
+		endpoint, method, description string
+		body                          interface{}
+		expectedCode                  int
 	}{
 		{
 			endpoint:     "discover",
 			method:       http.MethodGet,
+			description:  "all users",
 			expectedCode: http.StatusOK,
 		},
-		//{
-		//	endpoint:     "swipe",
-		//	method:       http.MethodPost,
-		//	expectedCode: http.StatusOK,
-		//},
+		{
+			endpoint:    "swipe",
+			description: "match",
+			method:      http.MethodPost,
+			body: &handlers.SwipeRequest{
+				UserID:     2,
+				Preference: true,
+			},
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:    "swipe",
+			description: "no match",
+			method:      http.MethodPost,
+			body: &handlers.SwipeRequest{
+				UserID:     3,
+				Preference: true,
+			},
+			expectedCode: http.StatusOK,
+		},
 	}
 
 	for _, tc := range cases {
-		t.Run(fmt.Sprintf("%s/%s", tc.method, tc.endpoint), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s/%s %s", tc.method, tc.endpoint, tc.description), func(t *testing.T) {
 			srv := newTestServer(t)
 
 			loginData := makeRequest(
@@ -229,7 +249,16 @@ func TestAuthenticated(t *testing.T) {
 			testDir := getTestDataDirectory()
 			expected, err := os.ReadFile(filepath.Join(
 				testDir,
-				strings.ReplaceAll(fmt.Sprintf("%s.%s.json", tc.endpoint, tc.method), "/", "."),
+				strings.ReplaceAll(
+					fmt.Sprintf(
+						"%s.%s.%s.json",
+						tc.endpoint,
+						tc.method,
+						strings.ReplaceAll(tc.description, " ", ""),
+					),
+					"/",
+					".",
+				),
 			))
 			require.NoError(t, err)
 

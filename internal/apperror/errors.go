@@ -8,6 +8,7 @@ import (
 // NoResults represents when no requested records exist in the database.
 var NoResults = errors.New("no results found in database")
 
+// Status code of an Error, represents the general reason for the error.
 type Status uint8
 
 const (
@@ -25,8 +26,6 @@ type Error struct {
 	status Status
 	error  error
 }
-
-// TODO use ToHTTP throughout
 
 // ToHTTP takes a *Error and converts it into a *HTTPResponse.
 func (e *Error) ToHTTP() *HTTPResponse {
@@ -59,6 +58,13 @@ func (e *Error) Error() string {
 func BadInput(err error) *Error {
 	return &Error{
 		status: StatusBadInput,
+		error:  err,
+	}
+}
+
+func NotFound(err error) *Error {
+	return &Error{
+		status: StatusNotFound,
 		error:  err,
 	}
 }

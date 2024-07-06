@@ -1,1 +1,1 @@
-TRUNCATE public.user;
+TRUNCATE public.user CASCADE;

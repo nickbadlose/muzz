@@ -65,6 +65,10 @@ func (us *UserService) Discover(ctx context.Context, userID int) ([]*muzz.UserDe
 
 	users, err := us.repository.GetUsers(ctx, userID)
 	if err != nil {
+		if errors.Is(err, apperror.NoResults) {
+			return nil, apperror.NotFound(err)
+		}
+
 		logger.Error(ctx, "getting users from database", err)
 		return nil, apperror.Internal(err)
 	}

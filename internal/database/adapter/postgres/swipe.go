@@ -2,10 +2,7 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"github.com/nickbadlose/muzz"
-	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/database"
 )
 
@@ -51,9 +48,6 @@ func getSwipeWithTx(ctx context.Context, r database.Reader, userID, swipedUserID
 
 	entity := new(swipeEntity)
 	err = row.Scan(&entity.id, &entity.userID, &entity.swipedUserID, &entity.preference)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, apperror.NoResults
-	}
 	if err != nil {
 		return nil, err
 	}

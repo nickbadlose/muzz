@@ -1,13 +1,14 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz/api/handlers"
 	"github.com/nickbadlose/muzz/internal/auth"
 	httpMiddleware "github.com/nickbadlose/muzz/internal/middleware/http"
-	"net/http"
 )
 
 func New(h *handlers.Handlers, v *auth.Authorizer) http.Handler {
@@ -42,6 +43,7 @@ func New(h *handlers.Handlers, v *auth.Authorizer) http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(httpMiddleware.NewAuthMiddleware(v))
 		r.Get("/discover", h.Discover)
+		r.Post("/swipe", h.Swipe)
 	})
 
 	return r

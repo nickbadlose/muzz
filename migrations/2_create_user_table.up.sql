@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS public.user (
+CREATE TABLE public.user (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL,
     password TEXT NOT NULL,
@@ -6,5 +6,5 @@ CREATE TABLE IF NOT EXISTS public.user (
     gender TEXT NOT NULL,
     age INT NOT NULL,
     created TIMESTAMP NOT NULL DEFAULT NOW(),
-    unique(email)
+    CONSTRAINT unique_email UNIQUE (email)
 );
