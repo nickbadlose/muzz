@@ -9,7 +9,7 @@ Muzz tech test
 
 We use an SQL builder package, [upper/db](https://upper.io/v4/) to build SQL queries. Using an SQL builder forces 
 paramterised queries, which helps protect against SQL injection. It also means we can freely migrate between any of the 
-SQL variants supported by the lib without breaking changes.
+SQL variants supported by the lib without breaking changes. 
 
 We create our own Database interface for clients as a facade for the unwanted complexities of the lib. This also allows
 clients to decouple from the upper/db library, so if we wish to migrate to a different SQL builder, we can without 
@@ -19,6 +19,7 @@ TODO
 - package level doc - doc.go
 - package level tests
 - mock db
+- state in README how unit testing is much easier with adapter pattern. We can use complicated sql mock on just repository methods and mock repositories for unit tests of service.
 
 ## Log Package
 
@@ -28,6 +29,8 @@ and decorate the package with extra methods, such as logger.MaybeError.
 It also allows us to present the zap logging package as a global logger, which for logging I prefer global
 loggers, as it means we can log in any deeply nested places with ease and without parameter drilling a logger. Or
 without attaching multiple methods to the struct like so.
+
+It also utilises the functional options pattern, which allows us to add configurations without breaking changes.
 
 With composite logger:
 ```go

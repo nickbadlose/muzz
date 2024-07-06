@@ -18,31 +18,37 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/nickbadlose/muzz/api/handlers"
+	"github.com/nickbadlose/muzz/api/router"
 	"github.com/nickbadlose/muzz/config"
-	"github.com/nickbadlose/muzz/internal/app"
-	"github.com/nickbadlose/muzz/internal/http/handlers"
-	"github.com/nickbadlose/muzz/internal/http/router"
-	"github.com/nickbadlose/muzz/internal/pkg/auth"
-	"github.com/nickbadlose/muzz/internal/pkg/database"
-	"github.com/nickbadlose/muzz/internal/store"
+	"github.com/nickbadlose/muzz/internal/auth"
+	"github.com/nickbadlose/muzz/internal/database"
+	"github.com/nickbadlose/muzz/internal/database/adapter/postgres"
+	"github.com/nickbadlose/muzz/internal/service"
 	"github.com/stretchr/testify/require"
 )
 
 func newTestServer(t *testing.T) *httptest.Server {
 	db := setupDB(t)
-	str := store.New(db)
 	cfg := config.Load()
-	au := auth.NewAuthoriser(cfg)
-	svc := app.NewService(str, au)
-	h := handlers.NewHandlers(svc, au)
+	matchAdapter := postgres.NewMatchAdapter(db)
+	userAdapter := postgres.NewUserAdapter(db)
 
-	srv := httptest.NewServer(router.New(h, au))
+	authorizer := auth.NewAuthorizer(cfg)
+
+	authService := service.NewAuthService(userAdapter, authorizer)
+	matchService := service.NewMatchService(matchAdapter)
+	userService := service.NewUserService(userAdapter)
+
+	hlr := handlers.New(authorizer, authService, userService, matchService)
+
+	srv := httptest.NewServer(router.New(hlr, authorizer))
 	t.Cleanup(srv.Close)
 
 	return srv
 }
 
-func setupDB(t *testing.T) database.Database {
+func setupDB(t *testing.T) *database.Database {
 	// TODO don't continue on errorNoChange, it means some migrations haven't run correctly?
 
 	// TODO auth from cfg
@@ -183,6 +189,11 @@ func TestAuthenticated(t *testing.T) {
 			method:       http.MethodGet,
 			expectedCode: http.StatusOK,
 		},
+		//{
+		//	endpoint:     "swipe",
+		//	method:       http.MethodPost,
+		//	expectedCode: http.StatusOK,
+		//},
 	}
 
 	for _, tc := range cases {

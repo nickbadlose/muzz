@@ -36,57 +36,52 @@ var requiredEnv = []string{
 	cfgJWTDuration,
 }
 
-// Config provides an interface to retrieve environment variables from.
-type Config interface {
-	// Env retrieves the environment the app is running in.
-	Env() string
-	// Port retrieves the port to run the server on.
-	Port() string
-	// DatabaseHost retrieves the host of the database to connect to.
-	DatabaseHost() string
-	// DatabaseUser retrieves the database user to authenticate with.
-	DatabaseUser() string
-	// DatabasePassword retrieves the database password to authenticate with.
-	DatabasePassword() string
-	// Database retrieves the database to connect to.
-	Database() string
-	// LogLevel retrieves the application log level to run.
-	LogLevel() string
-	// DomainName retrieves the domain name that the server is hosted on.
-	DomainName() string
-	// JWTDuration retrieves the expiry duration for JWTs.
-	JWTDuration() time.Duration
-	// JWTSecret retrieves the JWT secret to sign JWTs with.
-	JWTSecret() string
-}
+type Config struct{}
 
-type config struct{}
+// Env retrieves the environment the app is running in.
+func (cfg *Config) Env() string { return getEnv() }
 
-func (cfg *config) Env() string { return getEnv() }
-func (cfg *config) Port() string {
+// Port retrieves the port to run the server on.
+func (cfg *Config) Port() string {
 	port := viper.GetString(cfgPort)
 	if port == "" {
 		port = defaultPort
 	}
 	return fmt.Sprintf(":%s", port)
 }
-func (cfg *config) DatabaseHost() string     { return viper.GetString(cfgDatabaseHost) }
-func (cfg *config) DatabaseUser() string     { return viper.GetString(cfgDatabaseUser) }
-func (cfg *config) DatabasePassword() string { return viper.GetString(cfgDatabasePassword) }
-func (cfg *config) Database() string         { return viper.GetString(cfgDatabase) }
-func (cfg *config) LogLevel() string         { return viper.GetString(cfgLogLevel) }
-func (cfg *config) DomainName() string       { return viper.GetString(cfgDomainName) }
-func (cfg *config) JWTDuration() time.Duration {
+
+// DatabaseHost retrieves the host of the database to connect to.
+func (cfg *Config) DatabaseHost() string { return viper.GetString(cfgDatabaseHost) }
+
+// DatabaseUser retrieves the database user to authenticate with.
+func (cfg *Config) DatabaseUser() string { return viper.GetString(cfgDatabaseUser) }
+
+// DatabasePassword retrieves the database password to authenticate with.
+func (cfg *Config) DatabasePassword() string { return viper.GetString(cfgDatabasePassword) }
+
+// Database retrieves the database to connect to.
+func (cfg *Config) Database() string { return viper.GetString(cfgDatabase) }
+
+// LogLevel retrieves the application log level to run.
+func (cfg *Config) LogLevel() string { return viper.GetString(cfgLogLevel) }
+
+// DomainName retrieves the domain name that the server is hosted on.
+func (cfg *Config) DomainName() string { return viper.GetString(cfgDomainName) }
+
+// JWTDuration retrieves the expiry duration for JWTs.
+func (cfg *Config) JWTDuration() time.Duration {
 	dur := viper.GetDuration(cfgJWTDuration)
 	if dur == 0 {
 		dur = defaultJWTDuration
 	}
 	return dur
 }
-func (cfg *config) JWTSecret() string { return viper.GetString(cfgJWTSecret) }
+
+// JWTSecret retrieves the JWT secret to sign JWTs with.
+func (cfg *Config) JWTSecret() string { return viper.GetString(cfgJWTSecret) }
 
 // MustLoad calls Load and makes a call to log.Fatal if any required env vars haven't been set.
-func MustLoad() Config {
+func MustLoad() *Config {
 	cfg := Load()
 
 	// check if required env vars are set.
@@ -102,7 +97,7 @@ func MustLoad() Config {
 
 // Load the environment into the viper package and returns a new Config interface to retrieve env vars. The env is
 // configured from a root level "<environment>.env" file and then overwriting with environment variables.
-func Load() Config {
+func Load() *Config {
 	env := getEnv()
 	viper.AutomaticEnv()
 
@@ -119,7 +114,7 @@ func Load() Config {
 		}
 	}
 
-	return &config{}
+	return &Config{}
 }
 
 func getEnv() string {

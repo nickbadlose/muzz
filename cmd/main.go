@@ -2,10 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/nickbadlose/muzz/internal/http/handlers"
-	"github.com/nickbadlose/muzz/internal/http/router"
-	"github.com/nickbadlose/muzz/internal/pkg/auth"
-	"github.com/nickbadlose/muzz/internal/store"
 	"log"
 	"net/http"
 	"os"
@@ -13,10 +9,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/nickbadlose/muzz/api/handlers"
+	"github.com/nickbadlose/muzz/api/router"
 	"github.com/nickbadlose/muzz/config"
-	"github.com/nickbadlose/muzz/internal/app"
-	"github.com/nickbadlose/muzz/internal/pkg/database"
-	"github.com/nickbadlose/muzz/internal/pkg/logger"
+	"github.com/nickbadlose/muzz/internal/auth"
+	"github.com/nickbadlose/muzz/internal/database"
+	"github.com/nickbadlose/muzz/internal/database/adapter/postgres"
+	"github.com/nickbadlose/muzz/internal/logger"
+	"github.com/nickbadlose/muzz/internal/service"
 )
 
 const (
@@ -49,14 +49,20 @@ func main() {
 		log.Fatalf("failed to initialize database: %s", err)
 	}
 
-	str := store.New(db)
-	au := auth.NewAuthoriser(cfg)
-	svc := app.NewService(str, au)
-	hlr := handlers.NewHandlers(svc, au)
+	matchAdapter := postgres.NewMatchAdapter(db)
+	userAdapter := postgres.NewUserAdapter(db)
+
+	authorizer := auth.NewAuthorizer(cfg)
+
+	authService := service.NewAuthService(userAdapter, authorizer)
+	matchService := service.NewMatchService(matchAdapter)
+	userService := service.NewUserService(userAdapter)
+
+	hlr := handlers.New(authorizer, authService, userService, matchService)
 
 	// TODO server configuration
 	server := &http.Server{
-		Handler: router.New(hlr, au),
+		Handler: router.New(hlr, authorizer),
 		Addr:    cfg.Port(),
 	}
 
