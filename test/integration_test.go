@@ -149,7 +149,7 @@ func TestPublic(t *testing.T) {
 			endpoint: "user/create",
 			method:   http.MethodPost,
 			body: &handlers.CreateUserRequest{
-				Email:    "test6@test.com",
+				Email:    "test8@test.com",
 				Password: "Pa55w0rd!",
 				Name:     "test",
 				Gender:   "female",
@@ -184,14 +184,28 @@ func TestPublic(t *testing.T) {
 
 func TestAuthenticated(t *testing.T) {
 	cases := []struct {
-		endpoint, method, description string
-		body                          interface{}
-		expectedCode                  int
+		endpoint, method, description, queryParams string
+		body                                       interface{}
+		expectedCode                               int
 	}{
 		{
 			endpoint:     "discover",
 			method:       http.MethodGet,
 			description:  "all users",
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "females 20 - 30",
+			queryParams:  "maxAge=30&minAge=20&genders=female",
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "males and unspecified",
+			queryParams:  "genders=male,unspecified",
 			expectedCode: http.StatusOK,
 		},
 		{
@@ -238,7 +252,7 @@ func TestAuthenticated(t *testing.T) {
 			resp := makeRequest(
 				t,
 				tc.method,
-				fmt.Sprintf("%s/%s", srv.URL, tc.endpoint),
+				fmt.Sprintf("%s/%s?%s", srv.URL, tc.endpoint, tc.queryParams),
 				tc.body,
 				&header{
 					key:   "Authorization",

@@ -142,3 +142,177 @@ func TestGender_String(t *testing.T) {
 		require.Equal(t, "Gender(100)", Gender(100).String())
 	})
 }
+
+func TestUserFiltersFromParams(t *testing.T) {
+	validCases := []struct {
+		name                    string
+		maxAge, minAge, genders string
+		out                     *UserFilters
+	}{
+		{
+			name:    "valid no params provided",
+			maxAge:  "",
+			minAge:  "",
+			genders: "",
+			out:     &UserFilters{},
+		},
+		{
+			name:    "valid all params provided",
+			maxAge:  "30",
+			minAge:  "20",
+			genders: "male,female,unspecified",
+			out:     &UserFilters{MaxAge: 30, MinAge: 20, Genders: []Gender{GenderMale, GenderFemale, GenderUnspecified}},
+		},
+		{
+			name:    "valid with invalid genders",
+			genders: "invalidGender,another invalid gender",
+			out:     &UserFilters{MaxAge: 0, MinAge: 0, Genders: []Gender{GenderUndefined, GenderUndefined}},
+		},
+	}
+
+	for _, tc := range validCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := UserFiltersFromParams(tc.maxAge, tc.minAge, tc.genders)
+			require.NoError(t, err)
+			require.Equal(t, got, tc.out)
+		})
+	}
+
+	errCases := []struct {
+		name                    string
+		maxAge, minAge, genders string
+		errMessage              string
+	}{
+		{
+			name:       "invalid max age",
+			maxAge:     "not an int",
+			errMessage: "max age must be an integer: strconv.Atoi: parsing \"not an int\": invalid syntax",
+		},
+		{
+			name:       "invalid min age",
+			minAge:     "not an int",
+			errMessage: "min age must be an integer: strconv.Atoi: parsing \"not an int\": invalid syntax",
+		},
+	}
+
+	for _, tc := range errCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := UserFiltersFromParams(tc.maxAge, tc.minAge, tc.genders)
+			require.Nil(t, got)
+			require.Error(t, err)
+			require.Equal(t, tc.errMessage, err.Error())
+		})
+	}
+}
+
+func TestGetUsersInput_Validate(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		input := &GetUsersInput{
+			UserID:  1,
+			Filters: nil,
+		}
+
+		require.NoError(t, input.Validate())
+	})
+
+	validCases := []struct {
+		name  string
+		input *GetUsersInput
+	}{
+		{
+			name: "valid with filters",
+			input: &GetUsersInput{
+				UserID: 1,
+				Filters: &UserFilters{
+					MaxAge:  30,
+					MinAge:  20,
+					Genders: []Gender{GenderMale, GenderFemale, GenderUnspecified},
+				},
+			},
+		},
+		{
+			name: "valid without filters",
+			input: &GetUsersInput{
+				UserID:  1,
+				Filters: nil,
+			},
+		},
+	}
+
+	for _, tc := range validCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.NoError(t, tc.input.Validate())
+		})
+	}
+
+	errCases := []struct {
+		name       string
+		input      *GetUsersInput
+		errMessage string
+	}{
+		{
+			name: "invalid no user id",
+			input: &GetUsersInput{
+				UserID:  0,
+				Filters: nil,
+			},
+			errMessage: "user id is a required field",
+		},
+		{
+			name: "invalid filters, max age less than 18",
+			input: &GetUsersInput{
+				UserID: 1,
+				Filters: &UserFilters{
+					MaxAge:  10,
+					MinAge:  0,
+					Genders: nil,
+				},
+			},
+			errMessage: "max age cannot be less than 18",
+		},
+		{
+			name: "invalid filters, min age less than 18",
+			input: &GetUsersInput{
+				UserID: 1,
+				Filters: &UserFilters{
+					MaxAge:  30,
+					MinAge:  10,
+					Genders: nil,
+				},
+			},
+			errMessage: "min age cannot be less than 18",
+		},
+		{
+			name: "invalid filters, max age less than min age",
+			input: &GetUsersInput{
+				UserID: 1,
+				Filters: &UserFilters{
+					MaxAge:  30,
+					MinAge:  40,
+					Genders: nil,
+				},
+			},
+			errMessage: "max age cannot be less than min age",
+		},
+		{
+			name: "invalid filters, invalid genders",
+			input: &GetUsersInput{
+				UserID: 1,
+				Filters: &UserFilters{
+					MaxAge:  30,
+					MinAge:  20,
+					Genders: []Gender{GenderUndefined},
+				},
+			},
+			errMessage: "invalid gender, valid values are:",
+		},
+	}
+
+	for _, tc := range errCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.input.Validate()
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.errMessage)
+		})
+	}
+}

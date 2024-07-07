@@ -21,8 +21,10 @@ const (
 	maxConnLifetime    = 30 * time.Minute
 )
 
-// errNoConnection error returned when there is no connection initialised.
-var errNoConnection = errors.New(`no database connection`)
+var (
+	// errNoConnection error returned when there is no connection initialised.
+	errNoConnection = errors.New(`no database connection`)
+)
 
 // Config the set of configurations required for a database connection.
 type Config struct {
@@ -57,53 +59,12 @@ func (d Database) WriteSessionContext(ctx context.Context) (Writer, error) {
 	return d.client.WithContext(ctx).SQL(), nil
 }
 
-// TransactionFunc wraps a database transaction.
-type TransactionFunc = func(tx Client) error
-
-// TxContext performs the provided TransactionFunc against the database.
+// TxContext performs the provided transaction func against the database.
 func (d Database) TxContext(ctx context.Context, fn func(tx Client) error, opts *sql.TxOptions) error {
 	if d.client == nil {
 		return errNoConnection
 	}
 	return d.client.TxContext(ctx, fn, opts)
-}
-
-// New instantiates a new Database and opens a connection via the defaultClientFunc.
-func New(ctx context.Context, p *Config) (*Database, error) {
-	return NewWithClientFunc(ctx, p, defaultClientFunc)
-}
-
-// NewWithClientFunc instantiates a new Database and opens a connection via the provided ClientFunc.
-func NewWithClientFunc(ctx context.Context, p *Config, fn ClientFunc) (*Database, error) {
-	client, err := fn(ctx, p)
-
-	return &Database{client: client}, err
-}
-
-// ClientFunc is a function which can open a connection to the database.
-type ClientFunc func(ctx context.Context, p *Config) (Client, error)
-
-var defaultClientFunc ClientFunc = func(ctx context.Context, p *Config) (Client, error) {
-	db, err := sql.Open(
-		databaseDriver,
-		fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=disable", databaseDriver, p.Username, p.Password, p.Host, p.Name),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	// bind this to upper's sqlbuilder.
-	conn, err := postgresql.New(db)
-	if err != nil {
-		return nil, err
-	}
-
-	conn = conn.WithContext(ctx)
-	conn.SetMaxIdleConns(maxIdleConnections)
-	conn.SetMaxOpenConns(maxOpenConnections)
-	conn.SetConnMaxLifetime(maxConnLifetime)
-
-	return wrapSession(conn), nil
 }
 
 // Ping pings the current connection to the database.
@@ -120,4 +81,45 @@ func (d Database) Close() error {
 		return nil
 	}
 	return d.client.Close()
+}
+
+// New instantiates a new Database and opens a connection via the defaultClientFunc.
+func New(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (Client, error)) (*Database, error) {
+	client, err := openConnection(ctx, cfg, fn...)
+
+	return &Database{client: client}, err
+}
+
+// openConnection opens a new connection to the database using the supplied
+// username u and password p.
+func openConnection(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (Client, error)) (Client, error) {
+	var dft = defaultClientFunc
+	if len(fn) > 0 {
+		dft = fn[0]
+	}
+
+	return dft(ctx, cfg)
+}
+
+var defaultClientFunc = func(ctx context.Context, cfg *Config) (Client, error) {
+	db, err := sql.Open(
+		databaseDriver,
+		fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=disable", databaseDriver, cfg.Username, cfg.Password, cfg.Host, cfg.Name),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	// bind this to upper's sqlbuilder.
+	conn, err := postgresql.New(db)
+	if err != nil {
+		return nil, err
+	}
+
+	conn = conn.WithContext(ctx)
+	conn.SetMaxIdleConns(maxIdleConnections)
+	conn.SetMaxOpenConns(maxOpenConnections)
+	conn.SetConnMaxLifetime(maxConnLifetime)
+
+	return WrapSession(conn), nil
 }

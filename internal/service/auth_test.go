@@ -63,16 +63,23 @@ func TestAuthService_Login(t *testing.T) {
 	})
 
 	errCases := []struct {
-		name           string
-		input          *muzz.LoginInput
-		setupMockStore func(*mockservice.AuthRepository)
-		errMessage     string
-		errStatus      apperror.Status
+		name          string
+		input         *muzz.LoginInput
+		setupMockRepo func(*mockservice.AuthRepository)
+		errMessage    string
+		errStatus     apperror.Status
 	}{
+		{
+			name:          "invalid input",
+			input:         &muzz.LoginInput{},
+			setupMockRepo: func(m *mockservice.AuthRepository) {},
+			errMessage:    "email is a required field",
+			errStatus:     apperror.StatusBadInput,
+		},
 		{
 			name:  "error from repository",
 			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!"},
-			setupMockStore: func(m *mockservice.AuthRepository) {
+			setupMockRepo: func(m *mockservice.AuthRepository) {
 				m.EXPECT().UserByEmail(mock.Anything, "test@test.com").
 					Once().Return(nil, errors.New("database error"))
 			},
@@ -80,16 +87,9 @@ func TestAuthService_Login(t *testing.T) {
 			errStatus:  apperror.StatusInternal,
 		},
 		{
-			name:           "invalid input",
-			input:          &muzz.LoginInput{},
-			setupMockStore: func(m *mockservice.AuthRepository) {},
-			errMessage:     "email is a required field",
-			errStatus:      apperror.StatusBadInput,
-		},
-		{
 			name:  "incorrect email",
 			input: &muzz.LoginInput{Email: "wrong@email.com", Password: "Pa55w0rd!"},
-			setupMockStore: func(m *mockservice.AuthRepository) {
+			setupMockRepo: func(m *mockservice.AuthRepository) {
 				m.EXPECT().UserByEmail(mock.Anything, "wrong@email.com").
 					Once().Return(nil, apperror.NoResults)
 			},
@@ -99,7 +99,7 @@ func TestAuthService_Login(t *testing.T) {
 		{
 			name:  "authentication failed",
 			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!"},
-			setupMockStore: func(m *mockservice.AuthRepository) {
+			setupMockRepo: func(m *mockservice.AuthRepository) {
 				m.EXPECT().UserByEmail(mock.Anything, "test@test.com").
 					Once().Return(&muzz.User{
 					ID:       0,
@@ -118,7 +118,7 @@ func TestAuthService_Login(t *testing.T) {
 	for _, tc := range errCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewAuthRepository(t)
-			tc.setupMockStore(m)
+			tc.setupMockRepo(m)
 			sut := newTestAuthService(m)
 
 			got, err := sut.Login(context.Background(), tc.input)

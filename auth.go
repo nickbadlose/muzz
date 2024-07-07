@@ -9,11 +9,11 @@ type LoginInput struct {
 }
 
 // Validate the LoginInput fields.
-func (lr *LoginInput) Validate() error {
-	if lr.Email == "" {
+func (in *LoginInput) Validate() error {
+	if in.Email == "" {
 		return errors.New("email is a required field")
 	}
-	if lr.Password == "" {
+	if in.Password == "" {
 		return errors.New("password is a required field")
 	}
 

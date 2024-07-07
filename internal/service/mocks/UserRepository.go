@@ -82,7 +82,7 @@ func (_c *UserRepository_CreateUser_Call) RunAndReturn(run func(context.Context,
 }
 
 // GetUsers provides a mock function with given fields: _a0, _a1
-func (_m *UserRepository) GetUsers(_a0 context.Context, _a1 int) ([]*muzz.UserDetails, error) {
+func (_m *UserRepository) GetUsers(_a0 context.Context, _a1 *muzz.GetUsersInput) ([]*muzz.UserDetails, error) {
 	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
@@ -91,10 +91,10 @@ func (_m *UserRepository) GetUsers(_a0 context.Context, _a1 int) ([]*muzz.UserDe
 
 	var r0 []*muzz.UserDetails
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, int) ([]*muzz.UserDetails, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *muzz.GetUsersInput) ([]*muzz.UserDetails, error)); ok {
 		return rf(_a0, _a1)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, int) []*muzz.UserDetails); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *muzz.GetUsersInput) []*muzz.UserDetails); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
@@ -102,7 +102,7 @@ func (_m *UserRepository) GetUsers(_a0 context.Context, _a1 int) ([]*muzz.UserDe
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, int) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, *muzz.GetUsersInput) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)
@@ -118,14 +118,14 @@ type UserRepository_GetUsers_Call struct {
 
 // GetUsers is a helper method to define mock.On call
 //   - _a0 context.Context
-//   - _a1 int
+//   - _a1 *muzz.GetUsersInput
 func (_e *UserRepository_Expecter) GetUsers(_a0 interface{}, _a1 interface{}) *UserRepository_GetUsers_Call {
 	return &UserRepository_GetUsers_Call{Call: _e.mock.On("GetUsers", _a0, _a1)}
 }
 
-func (_c *UserRepository_GetUsers_Call) Run(run func(_a0 context.Context, _a1 int)) *UserRepository_GetUsers_Call {
+func (_c *UserRepository_GetUsers_Call) Run(run func(_a0 context.Context, _a1 *muzz.GetUsersInput)) *UserRepository_GetUsers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(int))
+		run(args[0].(context.Context), args[1].(*muzz.GetUsersInput))
 	})
 	return _c
 }
@@ -135,7 +135,7 @@ func (_c *UserRepository_GetUsers_Call) Return(_a0 []*muzz.UserDetails, _a1 erro
 	return _c
 }
 
-func (_c *UserRepository_GetUsers_Call) RunAndReturn(run func(context.Context, int) ([]*muzz.UserDetails, error)) *UserRepository_GetUsers_Call {
+func (_c *UserRepository_GetUsers_Call) RunAndReturn(run func(context.Context, *muzz.GetUsersInput) ([]*muzz.UserDetails, error)) *UserRepository_GetUsers_Call {
 	_c.Call.Return(run)
 	return _c
 }

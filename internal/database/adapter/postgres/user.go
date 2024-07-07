@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/database"
@@ -78,7 +77,7 @@ func (ua *UserAdapter) UserByEmail(ctx context.Context, email string) (*muzz.Use
 
 	// TODO index searching by email
 	columns := []interface{}{"id", "email", "password", "name", "gender", "age"}
-	row, err := r.SelectFrom(userTable).Columns(columns...).Where("email = ?", email).QueryRowContext(ctx)
+	row, err := r.Select(columns...).From(userTable).Where("email = ?", email).QueryRowContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -114,14 +113,20 @@ func (ua *UserAdapter) UserByEmail(ctx context.Context, email string) (*muzz.Use
 //  where tx can be either a transaction or read/write session based on the needs of the caller.
 //  Parent fn can just create ReadSessionContext or WriteSessionContext or tx and pass in.
 
-func (ua *UserAdapter) GetUsers(ctx context.Context, userID int) ([]*muzz.UserDetails, error) {
+func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]*muzz.UserDetails, error) {
 	r, err := ua.database.ReadSessionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
+	// TODO apply filters
+
 	columns := []interface{}{"id", "name", "gender", "age"}
-	rows, err := r.SelectFrom(userTable).Columns(columns...).Where("id != ?", userID).QueryContext(ctx)
+	selector := r.Select(columns...).From(userTable).Where("id != ?", in.UserID)
+
+	selector = applyUserFilters(in.Filters, selector)
+
+	rows, err := selector.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -159,4 +164,28 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, userID int) ([]*muzz.UserDe
 	}
 
 	return users, nil
+}
+
+func applyUserFilters(in *muzz.UserFilters, selector database.Selector) database.Selector {
+	if in == nil {
+		return selector
+	}
+
+	if in.MinAge != 0 {
+		selector = selector.And("age >= ?", in.MinAge)
+	}
+
+	if in.MaxAge != 0 {
+		selector = selector.And("age <= ?", in.MaxAge)
+	}
+
+	if len(in.Genders) != 0 {
+		genderStrings := make([]string, len(in.Genders))
+		for i, gen := range in.Genders {
+			genderStrings[i] = gen.String()
+		}
+		selector = selector.And("gender IN ", genderStrings)
+	}
+
+	return selector
 }

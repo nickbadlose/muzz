@@ -37,8 +37,8 @@ func createSwipeWithTx(ctx context.Context, w database.Writer, in *muzz.CreateSw
 
 func getSwipeWithTx(ctx context.Context, r database.Reader, userID, swipedUserID int) (*swipeEntity, error) {
 	columns := []interface{}{"id", "user_id", "swiped_user_id", "preference"}
-	row, err := r.SelectFrom(swipeTable).
-		Columns(columns...).
+	row, err := r.Select(columns...).
+		From(swipeTable).
 		Where("user_id = ?", userID).
 		And("swiped_user_id = ?", swipedUserID).
 		QueryRowContext(ctx)

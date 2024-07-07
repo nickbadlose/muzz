@@ -56,15 +56,23 @@ func TestUserService_Create(t *testing.T) {
 	})
 
 	errCases := []struct {
-		name           string
-		input          *muzz.CreateUserInput
-		setupMockStore func(m *mockservice.UserRepository)
-		errMessage     string
+		name          string
+		input         *muzz.CreateUserInput
+		setupMockRepo func(m *mockservice.UserRepository)
+		errMessage    string
+		errStatus     apperror.Status
 	}{
+		{
+			name:          "invalid input",
+			input:         &muzz.CreateUserInput{},
+			setupMockRepo: func(m *mockservice.UserRepository) {},
+			errMessage:    "email is a required field",
+			errStatus:     apperror.StatusBadInput,
+		},
 		{
 			name:  "error from repository",
 			input: &muzz.CreateUserInput{Email: "test@test.com", Password: "Pa55w0rd!", Name: "test", Gender: "female", Age: 25},
-			setupMockStore: func(m *mockservice.UserRepository) {
+			setupMockRepo: func(m *mockservice.UserRepository) {
 				m.EXPECT().CreateUser(mock.Anything, &muzz.CreateUserInput{
 					Email:    "test@test.com",
 					Password: "Pa55w0rd!",
@@ -74,19 +82,20 @@ func TestUserService_Create(t *testing.T) {
 				}).Once().Return(nil, errors.New("database error"))
 			},
 			errMessage: "database error",
+			errStatus:  apperror.StatusInternal,
 		},
 	}
 
 	for _, tc := range errCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewUserRepository(t)
-			tc.setupMockStore(m)
+			tc.setupMockRepo(m)
 			sut := NewUserService(m)
 
 			got, err := sut.Create(context.Background(), tc.input)
 			require.Nil(t, got)
 			require.Contains(t, err.Error(), tc.errMessage)
-			require.Equal(t, err.Status(), apperror.StatusInternal)
+			require.Equal(t, err.Status(), tc.errStatus)
 		})
 	}
 }
@@ -96,7 +105,10 @@ func TestUserService_Discover(t *testing.T) {
 		m := mockservice.NewUserRepository(t)
 
 		m.EXPECT().
-			GetUsers(mock.Anything, 1).Once().Return(
+			GetUsers(mock.Anything, &muzz.GetUsersInput{
+				UserID:  1,
+				Filters: nil,
+			}).Once().Return(
 			[]*muzz.UserDetails{
 				{
 					ID:     2,
@@ -116,7 +128,10 @@ func TestUserService_Discover(t *testing.T) {
 
 		sut := NewUserService(m)
 
-		got, err := sut.Discover(context.Background(), 1)
+		got, err := sut.Discover(context.Background(), &muzz.GetUsersInput{
+			UserID:  1,
+			Filters: nil,
+		})
 		require.Nil(t, err)
 		require.Equal(t, []*muzz.UserDetails{
 			{
@@ -135,15 +150,30 @@ func TestUserService_Discover(t *testing.T) {
 	})
 
 	errCases := []struct {
-		name           string
-		setupMockStore func(*mockservice.UserRepository)
-		errMessage     string
-		errStatus      apperror.Status
+		name          string
+		input         *muzz.GetUsersInput
+		setupMockRepo func(*mockservice.UserRepository)
+		errMessage    string
+		errStatus     apperror.Status
 	}{
 		{
+			name:          "invalid input",
+			input:         &muzz.GetUsersInput{},
+			setupMockRepo: func(m *mockservice.UserRepository) {},
+			errMessage:    "user id is a required field",
+			errStatus:     apperror.StatusBadInput,
+		},
+		{
 			name: "error from repository",
-			setupMockStore: func(m *mockservice.UserRepository) {
-				m.EXPECT().GetUsers(mock.Anything, 1).
+			input: &muzz.GetUsersInput{
+				UserID:  1,
+				Filters: nil,
+			},
+			setupMockRepo: func(m *mockservice.UserRepository) {
+				m.EXPECT().GetUsers(mock.Anything, &muzz.GetUsersInput{
+					UserID:  1,
+					Filters: nil,
+				}).
 					Once().Return(nil, errors.New("database error"))
 			},
 			errMessage: "database error",
@@ -154,10 +184,10 @@ func TestUserService_Discover(t *testing.T) {
 	for _, tc := range errCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewUserRepository(t)
-			tc.setupMockStore(m)
+			tc.setupMockRepo(m)
 			sut := NewUserService(m)
 
-			got, err := sut.Discover(context.Background(), 1)
+			got, err := sut.Discover(context.Background(), tc.input)
 			require.Empty(t, got)
 			require.Contains(t, err.Error(), tc.errMessage)
 			require.Equal(t, err.Status(), tc.errStatus)

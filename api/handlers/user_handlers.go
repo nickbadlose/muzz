@@ -2,11 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/logger"
-	"net/http"
 )
 
 // CreateUserRequest holds the information required to create a user.
@@ -110,7 +111,22 @@ func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appUsers, aErr := h.userService.Discover(r.Context(), userID)
+	filters, err := muzz.UserFiltersFromParams(
+		r.URL.Query().Get("maxAge"),
+		r.URL.Query().Get("minAge"),
+		r.URL.Query().Get("genders"),
+	)
+	if err != nil {
+		logger.Error(r.Context(), "getting filters from query params", err)
+		err = render.Render(w, r, apperror.BadRequestHTTP(err))
+		logger.MaybeError(r.Context(), renderingErrorMessage, err)
+		return
+	}
+
+	appUsers, aErr := h.userService.Discover(r.Context(), &muzz.GetUsersInput{
+		UserID:  userID,
+		Filters: filters,
+	})
 	if aErr != nil {
 		logger.MaybeError(
 			r.Context(),

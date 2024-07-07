@@ -19,18 +19,22 @@ import (
 // UserRepository is the interface to write and read data from the database.
 type UserRepository interface {
 	CreateUser(context.Context, *muzz.CreateUserInput) (*muzz.User, error)
-	GetUsers(context.Context, int) ([]*muzz.UserDetails, error)
+	GetUsers(context.Context, *muzz.GetUsersInput) ([]*muzz.UserDetails, error)
 }
 
 type UserService struct {
 	repository UserRepository
 }
 
+// TODO
+//  log.fatal in new funcs or return an error from them.
+//  Should we check for nil in pointer receiver methods?
+
 func NewUserService(s UserRepository) *UserService { return &UserService{s} }
 
 // Create takes a users details, validates them and creates a new user record in the database.
 func (us *UserService) Create(ctx context.Context, in *muzz.CreateUserInput) (*muzz.User, *apperror.Error) {
-	logger.Debug(ctx, "UserService Create", zap.Any("request", in))
+	logger.Debug(ctx, "UserService Create", zap.Any("input", in))
 
 	err := in.Validate()
 	if err != nil {
@@ -54,16 +58,16 @@ func (us *UserService) Create(ctx context.Context, in *muzz.CreateUserInput) (*m
 //  Pagination ? Check specs.
 //  Exclude already swiped profiles.
 
-func (us *UserService) Discover(ctx context.Context, userID int) ([]*muzz.UserDetails, *apperror.Error) {
-	logger.Debug(ctx, "UserService Discover", zap.Int("userID", userID))
+func (us *UserService) Discover(ctx context.Context, in *muzz.GetUsersInput) ([]*muzz.UserDetails, *apperror.Error) {
+	logger.Debug(ctx, "UserService Discover", zap.Any("input", in))
 
-	if userID == 0 {
-		err := apperror.BadInput(errors.New("user id is required"))
-		logger.Error(ctx, "validating GetUsers request", err)
-		return nil, err
+	err := in.Validate()
+	if err != nil {
+		logger.Error(ctx, "validating get users input", err)
+		return nil, apperror.BadInput(err)
 	}
 
-	users, err := us.repository.GetUsers(ctx, userID)
+	users, err := us.repository.GetUsers(ctx, in)
 	if err != nil {
 		if errors.Is(err, apperror.NoResults) {
 			return nil, apperror.NotFound(err)

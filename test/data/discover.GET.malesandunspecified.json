@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "id": 6,
+      "name": "test6",
+      "gender": "male",
+      "age": 29
+    },
+    {
+      "id": 7,
+      "name": "test7",
+      "gender": "unspecified",
+      "age": 27
+    }
+  ]
+}

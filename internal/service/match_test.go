@@ -44,16 +44,23 @@ func TestMatchService_Swipe(t *testing.T) {
 	})
 
 	errCases := []struct {
-		name           string
-		input          *muzz.CreateSwipeInput
-		setupMockStore func(*mockservice.MatchRepository)
-		errMessage     string
-		errStatus      apperror.Status
+		name          string
+		input         *muzz.CreateSwipeInput
+		setupMockRepo func(*mockservice.MatchRepository)
+		errMessage    string
+		errStatus     apperror.Status
 	}{
+		{
+			name:          "invalid input",
+			input:         &muzz.CreateSwipeInput{},
+			setupMockRepo: func(m *mockservice.MatchRepository) {},
+			errMessage:    "user id is a required field",
+			errStatus:     apperror.StatusBadInput,
+		},
 		{
 			name:  "error from repository",
 			input: &muzz.CreateSwipeInput{UserID: 1, SwipedUserID: 2, Preference: true},
-			setupMockStore: func(m *mockservice.MatchRepository) {
+			setupMockRepo: func(m *mockservice.MatchRepository) {
 				m.EXPECT().CreateSwipe(mock.Anything, &muzz.CreateSwipeInput{
 					UserID:       1,
 					SwipedUserID: 2,
@@ -64,19 +71,12 @@ func TestMatchService_Swipe(t *testing.T) {
 			errMessage: "database error",
 			errStatus:  apperror.StatusInternal,
 		},
-		{
-			name:           "invalid input",
-			input:          &muzz.CreateSwipeInput{},
-			setupMockStore: func(m *mockservice.MatchRepository) {},
-			errMessage:     "user id is a required field",
-			errStatus:      apperror.StatusBadInput,
-		},
 	}
 
 	for _, tc := range errCases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewMatchRepository(t)
-			tc.setupMockStore(m)
+			tc.setupMockRepo(m)
 			sut := NewMatchService(m)
 
 			got, err := sut.Swipe(context.Background(), tc.input)

@@ -1,10 +1,11 @@
 package muzz
 
 import (
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 	"net/mail"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 )
@@ -47,35 +48,35 @@ type CreateUserInput struct {
 }
 
 // Validate the CreateUserInput fields.
-func (r *CreateUserInput) Validate() error {
-	if r.Email == "" {
+func (in *CreateUserInput) Validate() error {
+	if in.Email == "" {
 		return errors.New("email is a required field")
 	}
 
-	err := validateEmail(r.Email)
+	err := validateEmail(in.Email)
 	if err != nil {
 		return err
 	}
 
-	if r.Password == "" {
+	if in.Password == "" {
 		return errors.New("password is a required field")
 	}
 
-	err = validatePassword(r.Password)
+	err = validatePassword(in.Password)
 	if err != nil {
 		return err
 	}
 
-	if r.Name == "" {
+	if in.Name == "" {
 		return errors.New("name is a required field")
 	}
 
-	gender := GenderValues[r.Gender]
+	gender := GenderValues[in.Gender]
 	if err := gender.Validate(); err != nil {
 		return err
 	}
 
-	if r.Age < minimumAge {
+	if in.Age < minimumAge {
 		return errors.New("the minimum age is 18")
 	}
 
@@ -189,4 +190,87 @@ func validateEmail(email string) error {
 		return errors.New("invalid email address: missing '.' in email domain")
 	}
 	return nil
+}
+
+type GetUsersInput struct {
+	UserID  int
+	Filters *UserFilters
+}
+
+func (in *GetUsersInput) Validate() error {
+	if in.UserID == 0 {
+		return errors.New("user id is a required field")
+	}
+
+	// TODO accept nil filter or not?
+	if in.Filters != nil {
+		return in.Filters.Validate()
+	}
+
+	return nil
+}
+
+type UserFilters struct {
+	MaxAge  int
+	MinAge  int
+	Genders []Gender
+}
+
+func (uf *UserFilters) Validate() error {
+	if uf.MaxAge < minimumAge && uf.MaxAge != 0 {
+		return errors.New("max age cannot be less than 18")
+	}
+
+	if uf.MinAge < minimumAge && uf.MinAge != 0 {
+		return errors.New("min age cannot be less than 18")
+	}
+
+	if uf.MaxAge < uf.MinAge {
+		return errors.New("max age cannot be less than min age")
+	}
+
+	for _, g := range uf.Genders {
+		err := g.Validate()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func UserFiltersFromParams(maxAge, minAge, genderQueryParam string) (*UserFilters, error) {
+	var (
+		maxAgeInt, minAgeInt int
+		genders              []Gender
+		err                  error
+	)
+
+	if maxAge != "" {
+		maxAgeInt, err = strconv.Atoi(maxAge)
+		if err != nil {
+			return nil, errors.Wrap(err, "max age must be an integer")
+		}
+	}
+
+	if minAge != "" {
+		minAgeInt, err = strconv.Atoi(minAge)
+		if err != nil {
+			return nil, errors.Wrap(err, "min age must be an integer")
+		}
+	}
+
+	if genderQueryParam != "" {
+		genderStrings := strings.Split(genderQueryParam, ",")
+		genders = make([]Gender, len(genderStrings))
+		for i, g := range genderStrings {
+			genders[i] = GenderValues[g]
+		}
+	}
+
+	return &UserFilters{
+		MaxAge:  maxAgeInt,
+		MinAge:  minAgeInt,
+		Genders: genders,
+	}, nil
 }
