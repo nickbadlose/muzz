@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/nickbadlose/muzz/internal/cache"
+	"github.com/nickbadlose/muzz/internal/location"
 	"log"
 	"net/http"
 	"os"
@@ -49,16 +51,22 @@ func main() {
 		log.Fatalf("failed to initialize database: %s", err)
 	}
 
+	c, err := cache.New(ctx, cfg.CachePassword(), cfg.CacheHost())
+	if err != nil {
+		log.Fatalf("failed to initialize cache: %s", err)
+	}
+
 	matchAdapter := postgres.NewMatchAdapter(db)
 	userAdapter := postgres.NewUserAdapter(db)
 
 	authorizer := auth.NewAuthorizer(cfg)
+	loc := location.New(cfg, c)
 
 	authService := service.NewAuthService(userAdapter, authorizer)
 	matchService := service.NewMatchService(matchAdapter)
 	userService := service.NewUserService(userAdapter)
 
-	hlr := handlers.New(authorizer, authService, userService, matchService)
+	hlr := handlers.New(authorizer, loc, authService, userService, matchService)
 
 	// TODO server configuration
 	server := &http.Server{

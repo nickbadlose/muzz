@@ -2,6 +2,7 @@ package muzz
 
 import (
 	"fmt"
+	"github.com/paulmach/orb"
 	"github.com/pkg/errors"
 	"net/mail"
 	"regexp"
@@ -18,6 +19,10 @@ import (
 const (
 	minimumAge            = 18
 	minimumPasswordLength = 8
+	minimumLat            = -90
+	maximumLat            = 90
+	minimumLon            = -180
+	maximumLon            = 180
 )
 
 // User contains all a users stored details.
@@ -28,14 +33,16 @@ type User struct {
 	Name     string
 	Gender   Gender
 	Age      int
+	Location orb.Point
 }
 
 // UserDetails contains only public user details.
 type UserDetails struct {
-	ID     int
-	Name   string
-	Gender Gender
-	Age    int
+	ID             int
+	Name           string
+	Gender         Gender
+	Age            int
+	DistanceFromMe float64
 }
 
 // CreateUserInput is the accepted request to create a user.
@@ -45,6 +52,7 @@ type CreateUserInput struct {
 	Name     string
 	Gender   string
 	Age      int
+	Location orb.Point
 }
 
 // Validate the CreateUserInput fields.
@@ -72,12 +80,18 @@ func (in *CreateUserInput) Validate() error {
 	}
 
 	gender := GenderValues[in.Gender]
-	if err := gender.Validate(); err != nil {
+	err = gender.Validate()
+	if err != nil {
 		return err
 	}
 
 	if in.Age < minimumAge {
 		return errors.New("the minimum age is 18")
+	}
+
+	err = validatePoint(in.Location)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -192,14 +206,32 @@ func validateEmail(email string) error {
 	return nil
 }
 
+func validatePoint(p orb.Point) error {
+	if p.Lat() < minimumLat || p.Lat() > maximumLat {
+		return errors.New("location latitude is out of range")
+	}
+
+	if p.Lon() < minimumLon || p.Lon() > maximumLon {
+		return errors.New("location longitude is out of range")
+	}
+
+	return nil
+}
+
 type GetUsersInput struct {
-	UserID  int
-	Filters *UserFilters
+	UserID   int
+	Location orb.Point
+	Filters  *UserFilters
 }
 
 func (in *GetUsersInput) Validate() error {
 	if in.UserID == 0 {
 		return errors.New("user id is a required field")
+	}
+
+	err := validatePoint(in.Location)
+	if err != nil {
+		return err
 	}
 
 	// TODO accept nil filter or not?

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/paulmach/orb"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -31,6 +32,16 @@ import (
 // TODO
 //  - have migrations_test.go file in here which test constraints etc.
 
+// mockLocation to mock getting the location from IP address. This is the only part of our integration tests we mock,
+// so we don't spam the geoip service.
+//
+// It also allows us to use a static location for the logged-in user, so test results are static.
+type mockLocation struct{}
+
+func (*mockLocation) ByIP(ctx context.Context, _ string) (orb.Point, error) {
+	return orb.Point{-5.0527, 50.266}, nil
+}
+
 func newTestServer(t *testing.T) *httptest.Server {
 	db := setupDB(t)
 	cfg := config.Load()
@@ -43,7 +54,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	matchService := service.NewMatchService(matchAdapter)
 	userService := service.NewUserService(userAdapter)
 
-	hlr := handlers.New(authorizer, authService, userService, matchService)
+	hlr := handlers.New(authorizer, &mockLocation{}, authService, userService, matchService)
 
 	srv := httptest.NewServer(router.New(hlr, authorizer))
 	t.Cleanup(srv.Close)
@@ -154,6 +165,7 @@ func TestPublic(t *testing.T) {
 				Name:     "test",
 				Gender:   "female",
 				Age:      25,
+				Location: handlers.Location{Lat: 50.266, Lon: -5.0527},
 			},
 			expectedCode: http.StatusCreated,
 		},

@@ -1,16 +1,18 @@
 {
   "results": [
     {
-      "id": 3,
-      "name": "test3",
-      "gender": "female",
-      "age": 28
-    },
-    {
       "id": 5,
       "name": "test5",
       "gender": "female",
-      "age": 25
+      "age": 25,
+      "distanceFromMe": 376.9843890581312
+    },
+    {
+      "id": 3,
+      "name": "test3",
+      "gender": "female",
+      "age": 28,
+      "distanceFromMe": 556.2354769908882
     }
   ]
 }

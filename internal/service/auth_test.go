@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/paulmach/orb"
 	"testing"
 
 	"github.com/nickbadlose/muzz"
@@ -46,7 +47,13 @@ func TestAuthService_Login(t *testing.T) {
 			}, nil,
 		)
 
-		got, err := sut.Login(context.Background(), &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!"})
+		m.EXPECT().UpdateUserLocation(mock.Anything, 1, orb.Point{1, 1}).
+			Once().Return(nil)
+
+		got, err := sut.Login(
+			context.Background(),
+			&muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!", Location: orb.Point{1, 1}},
+		)
 		require.Nil(t, err)
 		require.NotEmpty(t, got)
 
@@ -77,8 +84,8 @@ func TestAuthService_Login(t *testing.T) {
 			errStatus:     apperror.StatusBadInput,
 		},
 		{
-			name:  "error from repository",
-			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!"},
+			name:  "error from repository - user by email",
+			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!", Location: orb.Point{0, 0}},
 			setupMockRepo: func(m *mockservice.AuthRepository) {
 				m.EXPECT().UserByEmail(mock.Anything, "test@test.com").
 					Once().Return(nil, errors.New("database error"))
@@ -112,6 +119,26 @@ func TestAuthService_Login(t *testing.T) {
 			},
 			errMessage: "incorrect credentials",
 			errStatus:  apperror.StatusUnauthorised,
+		},
+		{
+			name:  "error from repository - update user location",
+			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!", Location: orb.Point{1, 1}},
+			setupMockRepo: func(m *mockservice.AuthRepository) {
+				m.EXPECT().UserByEmail(mock.Anything, "test@test.com").
+					Once().Return(&muzz.User{
+					ID:       1,
+					Email:    "test@test.com",
+					Password: "Pa55w0rd!",
+					Name:     "test",
+					Gender:   muzz.GenderMale,
+					Age:      25,
+				}, nil)
+
+				m.EXPECT().UpdateUserLocation(mock.Anything, 1, orb.Point{1, 1}).
+					Once().Return(errors.New("database error"))
+			},
+			errMessage: "database error",
+			errStatus:  apperror.StatusInternal,
 		},
 	}
 

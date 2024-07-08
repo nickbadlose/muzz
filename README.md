@@ -2,7 +2,17 @@
 Muzz tech test
 
 ## TODO
-- makefile for docker up / restart db and clear data. Migrations should be ran in these too
+- makefile for docker up / restart db and clear data. Migrations should be run in these too
+- Postgis vs mysql https://stackoverflow.com/a/22576304/22675476
+- Using geography type https://postgis.net/docs/manual-3.4/using_postgis_dbmanagement.html#PostGIS_GeographyVSGeometry
+- Postgis over posrtgres as global distances are curved and not plane. Postgis handles these calculations
+- https://postgis.net/docs/using_postgis_dbmanagement.html#Create_Geography_Tables
+- Get long/lat on FE vs BE:
+  - FE will only have to get once and can send on all subsequent queries. BE will need to get from IP on each request, can cache but still not ideal.
+  - State in README that I would probably discuss with peers to make decision on where I get it
+- GitHub actions with tests and push to dockerhub / ecr if available
+- https://postgis.net/workshops/postgis-intro/
+- Looks like IP is coming from ISP, may be better to just pass it in, in general, and use IP of request as backup?
 
 ## Postman
 

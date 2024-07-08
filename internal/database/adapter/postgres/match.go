@@ -57,6 +57,10 @@ func (ma *MatchAdapter) CreateSwipe(ctx context.Context, in *muzz.CreateSwipeInp
 			return nil
 		}
 
+		// TODO
+		//  batch insert matches if using 2 rows for one match
+		//  have createMatchWithTx take in multiple cmis
+
 		cmi := &muzz.CreateMatchInput{
 			UserID:        in.UserID,
 			MatchedUserID: in.SwipedUserID,

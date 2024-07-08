@@ -1,6 +1,7 @@
 package muzz
 
 import (
+	"github.com/paulmach/orb"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ func TestCreateUserInput_Validate(t *testing.T) {
 			Name:     "test",
 			Gender:   "male",
 			Age:      25,
+			Location: orb.Point{1, 1},
 		}
 
 		require.NoError(t, input.Validate())
@@ -103,6 +105,11 @@ func TestCreateUserInput_Validate(t *testing.T) {
 			name:       "invalid age: too low",
 			input:      &CreateUserInput{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: "male", Age: 17},
 			errMessage: "the minimum age is 18",
+		},
+		{
+			name:       "invalid longitude",
+			input:      &CreateUserInput{Email: "test@test.com", Password: "Pa55w0rd!", Name: "Test", Gender: "male", Age: 18, Location: orb.Point{1000, 1}},
+			errMessage: "location longitude is out of range",
 		},
 	}
 
@@ -305,6 +312,14 @@ func TestGetUsersInput_Validate(t *testing.T) {
 				},
 			},
 			errMessage: "invalid gender, valid values are:",
+		},
+		{
+			name: "invalid latitude",
+			input: &GetUsersInput{
+				UserID:   1,
+				Location: orb.Point{1, 1000},
+			},
+			errMessage: "location latitude is out of range",
 		},
 	}
 

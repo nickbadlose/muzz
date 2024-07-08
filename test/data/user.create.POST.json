@@ -5,6 +5,10 @@
     "password": "Pa55w0rd!",
     "name": "test",
     "gender": "female",
-    "age": 25
+    "age": 25,
+    "location": {
+      "latitude": 50.266,
+      "longitude": -5.0527
+    }
   }
 }

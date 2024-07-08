@@ -4,13 +4,15 @@
       "id": 6,
       "name": "test6",
       "gender": "male",
-      "age": 29
+      "age": 29,
+      "distanceFromMe": 406.1286967552764
     },
     {
       "id": 7,
       "name": "test7",
       "gender": "unspecified",
-      "age": 27
+      "age": 27,
+      "distanceFromMe": 572.8223586909709
     }
   ]
 }

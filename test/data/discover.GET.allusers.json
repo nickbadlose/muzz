@@ -4,37 +4,43 @@
       "id": 2,
       "name": "test2",
       "gender": "female",
-      "age": 18
-    },
-    {
-      "id": 3,
-      "name": "test3",
-      "gender": "female",
-      "age": 28
+      "age": 18,
+      "distanceFromMe": 0
     },
     {
       "id": 4,
       "name": "test4",
       "gender": "female",
-      "age": 40
+      "age": 40,
+      "distanceFromMe": 371.9400749152127
     },
     {
       "id": 5,
       "name": "test5",
       "gender": "female",
-      "age": 25
+      "age": 25,
+      "distanceFromMe": 376.9843890581312
     },
     {
       "id": 6,
       "name": "test6",
       "gender": "male",
-      "age": 29
+      "age": 29,
+      "distanceFromMe": 406.1286967552764
+    },
+    {
+      "id": 3,
+      "name": "test3",
+      "gender": "female",
+      "age": 28,
+      "distanceFromMe": 556.2354769908882
     },
     {
       "id": 7,
       "name": "test7",
       "gender": "unspecified",
-      "age": 27
+      "age": 27,
+      "distanceFromMe": 572.8223586909709
     }
   ]
 }

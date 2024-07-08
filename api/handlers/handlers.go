@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"github.com/nickbadlose/muzz/internal/service"
+	"github.com/paulmach/orb"
 )
 
 const (
@@ -24,13 +25,18 @@ type Authorizer interface {
 	UserFromContext(ctx context.Context) (userID int, err error)
 }
 
+type Locationer interface {
+	ByIP(ctx context.Context, sourceIP string) (orb.Point, error)
+}
+
 type Handlers struct {
 	authorizer   Authorizer
+	location     Locationer
 	authService  *service.AuthService
 	userService  *service.UserService
 	matchService *service.MatchService
 }
 
-func New(auth Authorizer, as *service.AuthService, us *service.UserService, ms *service.MatchService) *Handlers {
-	return &Handlers{auth, as, us, ms}
+func New(auth Authorizer, l Locationer, as *service.AuthService, us *service.UserService, ms *service.MatchService) *Handlers {
+	return &Handlers{auth, l, as, us, ms}
 }

@@ -20,6 +20,10 @@ const (
 	cfgDomainName       = "DOMAIN_NAME"
 	cfgJWTDuration      = "JWT_DURATION"
 	cfgJWTSecret        = "JWT_SECRET"
+	cfgGeoIpEndpoint    = "GEOIP_ENDPOINT"
+	cfgGeoIpAPIKey      = "GEOIP_API_KEY"
+	cfgCachePassword    = "CACHE_PASSWORD"
+	cfgCacheHost        = "CACHE_HOST"
 
 	// defaults
 	defaultEnv         = "development"
@@ -79,6 +83,18 @@ func (cfg *Config) JWTDuration() time.Duration {
 
 // JWTSecret retrieves the JWT secret to sign JWTs with.
 func (cfg *Config) JWTSecret() string { return viper.GetString(cfgJWTSecret) }
+
+// GeoIPAPIKey retrieves the API key for the geoip service..
+func (cfg *Config) GeoIPAPIKey() string { return viper.GetString(cfgGeoIpAPIKey) }
+
+// GeoIPEndpoint retrieves the endpoint for the geoip service..
+func (cfg *Config) GeoIPEndpoint() string { return viper.GetString(cfgGeoIpEndpoint) }
+
+// CacheHost retrieves the cache host to connect to.
+func (cfg *Config) CacheHost() string { return viper.GetString(cfgCacheHost) }
+
+// CachePassword retrieves the cache password to authenticate with.
+func (cfg *Config) CachePassword() string { return viper.GetString(cfgCachePassword) }
 
 // MustLoad calls Load and makes a call to log.Fatal if any required env vars haven't been set.
 func MustLoad() *Config {

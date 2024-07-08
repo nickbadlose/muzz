@@ -39,9 +39,17 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	location, err := h.location.ByIP(r.Context(), r.RemoteAddr)
+	if err != nil {
+		err = render.Render(w, r, apperror.InternalServerHTTP(err))
+		logger.MaybeError(r.Context(), renderingErrorMessage, err)
+		return
+	}
+
 	token, aErr := h.authService.Login(r.Context(), &muzz.LoginInput{
 		Email:    req.Email,
 		Password: req.Password,
+		Location: location,
 	})
 	if aErr != nil {
 		logger.MaybeError(

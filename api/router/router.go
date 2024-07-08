@@ -22,6 +22,7 @@ func New(h *handlers.Handlers, v *auth.Authorizer) http.Handler {
 
 	r.Use(
 		middleware.AllowContentType("application/json"),
+		middleware.RealIP,
 		middleware.Logger, // TODO custom logger?
 		middleware.Recoverer,
 	)

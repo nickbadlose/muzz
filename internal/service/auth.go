@@ -7,6 +7,7 @@ import (
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/logger"
+	"github.com/paulmach/orb"
 	"go.uber.org/zap"
 )
 
@@ -14,6 +15,7 @@ import (
 //  Check out github.com/deepmap/oapi-codegen /
 //  https://github.com/ThreeDotsLabs/wild-workouts-go-ddd-example/blob/master/internal/trainer/ports/openapi_api.gen.go
 //  for openai code gen docs
+//  Do some sort of docs, if README or swagger or something else
 
 type Authenticator interface {
 	Authenticate(user *muzz.User, password string) (string, *apperror.Error)
@@ -21,6 +23,7 @@ type Authenticator interface {
 
 type AuthRepository interface {
 	UserByEmail(ctx context.Context, email string) (*muzz.User, error)
+	UpdateUserLocation(ctx context.Context, id int, location orb.Point) error
 }
 
 type AuthService struct {
@@ -54,6 +57,12 @@ func (as *AuthService) Login(ctx context.Context, in *muzz.LoginInput) (string, 
 	if aErr != nil {
 		logger.Error(ctx, "authenticating user", aErr)
 		return "", aErr
+	}
+
+	err = as.repository.UpdateUserLocation(ctx, user.ID, in.Location)
+	if err != nil {
+		logger.Error(ctx, "updating user location", err)
+		return "", apperror.Internal(err)
 	}
 
 	return token, nil

@@ -8,25 +8,36 @@ import (
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/logger"
+	"github.com/paulmach/orb"
 )
 
 // CreateUserRequest holds the information required to create a user.
 type CreateUserRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Gender   string `json:"gender"`
-	Age      int    `json:"age"`
+	Email    string   `json:"email"`
+	Password string   `json:"password"`
+	Name     string   `json:"name"`
+	Gender   string   `json:"gender"`
+	Age      int      `json:"age"`
+	Location Location `json:"location"`
+}
+
+// TODO remove from requests if using ip address
+
+// Location represents the geographic coordinates as longitude and latitude
+type Location struct {
+	Lat float64 `json:"latitude"`
+	Lon float64 `json:"longitude"`
 }
 
 // User represents the full user details to present to the client.
 type User struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name"`
-	Gender   string `json:"gender"`
-	Age      int    `json:"age"`
+	ID       int      `json:"id"`
+	Email    string   `json:"email"`
+	Password string   `json:"password"`
+	Name     string   `json:"name"`
+	Gender   string   `json:"gender"`
+	Age      int      `json:"age"`
+	Location Location `json:"location"`
 }
 
 // UserResponse object to send to the client.
@@ -57,6 +68,7 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Name:     req.Name,
 		Gender:   req.Gender,
 		Age:      req.Age,
+		Location: orb.Point{req.Location.Lon, req.Location.Lat},
 	})
 	if aErr != nil {
 		logger.MaybeError(
@@ -75,6 +87,10 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 			Name:     user.Name,
 			Gender:   user.Gender.String(),
 			Age:      user.Age,
+			Location: Location{
+				Lat: user.Location.Lat(),
+				Lon: user.Location.Lon(),
+			},
 		},
 	})
 	if err != nil {
@@ -84,10 +100,11 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // UserDetails represents the public user details to present to the client.
 type UserDetails struct {
-	ID     int    `json:"id"`
-	Name   string `json:"name"`
-	Gender string `json:"gender"`
-	Age    int    `json:"age"`
+	ID             int     `json:"id"`
+	Name           string  `json:"name"`
+	Gender         string  `json:"gender"`
+	Age            int     `json:"age"`
+	DistanceFromMe float64 `json:"distanceFromMe"`
 }
 
 // DiscoverResponse object to send to the client.
@@ -123,9 +140,17 @@ func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	location, err := h.location.ByIP(r.Context(), r.RemoteAddr)
+	if err != nil {
+		err = render.Render(w, r, apperror.InternalServerHTTP(err))
+		logger.MaybeError(r.Context(), renderingErrorMessage, err)
+		return
+	}
+
 	appUsers, aErr := h.userService.Discover(r.Context(), &muzz.GetUsersInput{
-		UserID:  userID,
-		Filters: filters,
+		UserID:   userID,
+		Location: location,
+		Filters:  filters,
 	})
 	if aErr != nil {
 		logger.MaybeError(
@@ -139,10 +164,11 @@ func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 	users := make([]*UserDetails, 0, len(appUsers))
 	for _, user := range appUsers {
 		users = append(users, &UserDetails{
-			ID:     user.ID,
-			Name:   user.Name,
-			Gender: user.Gender.String(),
-			Age:    user.Age,
+			ID:             user.ID,
+			Name:           user.Name,
+			Gender:         user.Gender.String(),
+			Age:            user.Age,
+			DistanceFromMe: user.DistanceFromMe,
 		})
 	}
 

@@ -35,3 +35,11 @@ func BadRequestHTTP(err error) *HTTPResponse {
 		Error:  err.Error(),
 	}
 }
+
+// InternalServerHTTP returns an error wrapped in a http.StatusBadRequest.
+func InternalServerHTTP(err error) *HTTPResponse {
+	return &HTTPResponse{
+		Status: http.StatusInternalServerError,
+		Error:  err.Error(),
+	}
+}
