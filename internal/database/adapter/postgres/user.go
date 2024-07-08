@@ -106,7 +106,6 @@ func (ua *UserAdapter) UserByEmail(ctx context.Context, email string) (*muzz.Use
 	}
 
 	entity := new(userEntity)
-
 	err = row.Scan(&entity.id, &entity.email, &entity.password, &entity.name, &entity.gender, &entity.age)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, apperror.NoResults
@@ -138,16 +137,13 @@ func (ua *UserAdapter) UserByEmail(ctx context.Context, email string) (*muzz.Use
 //  Parent fn can just create ReadSessionContext or WriteSessionContext or tx and pass in.
 //  Exclude already swiped users from results.
 //  Have tie breaker order by column? ID check if that's default anyway
+//  index for swiped user_id (SELECT swiped_user_id FROM swipe WHERE user_id = ?) seed data and analyze before and after indexes for distance, swiped user etc.
 
 func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]*muzz.UserDetails, error) {
 	r, err := ua.database.ReadSessionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	// TODO
-	//  apply filters
-	//  convert distance to km with / 1000 in query
 
 	columns := []interface{}{
 		"id",
@@ -157,7 +153,11 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]
 		// TODO we are officially directly dependant on the upper lib here. So do we remove abstraction interface and just use lib?
 		db.Raw(`(location::geography <-> ST_SetSRID(ST_MakePoint(?,?),?)::geography) / 1000 AS distance`, in.Location.Lon(), in.Location.Lat(), srid),
 	}
-	selector := r.Select(columns...).From(userTable).Where("id != ?", in.UserID).OrderBy("distance")
+	selector := r.Select(columns...).
+		From(userTable).
+		Where("id != ?", in.UserID).
+		And("id NOT IN ?", db.Raw("(SELECT swiped_user_id FROM swipe WHERE user_id = ?)", in.UserID)).
+		OrderBy("distance")
 
 	selector = applyUserFilters(in.Filters, selector)
 

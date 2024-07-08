@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/paulmach/orb"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,6 +25,7 @@ import (
 	"github.com/nickbadlose/muzz/internal/database"
 	"github.com/nickbadlose/muzz/internal/database/adapter/postgres"
 	"github.com/nickbadlose/muzz/internal/service"
+	"github.com/paulmach/orb"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,7 +38,7 @@ import (
 // It also allows us to use a static location for the logged-in user, so test results are static.
 type mockLocation struct{}
 
-func (*mockLocation) ByIP(ctx context.Context, _ string) (orb.Point, error) {
+func (*mockLocation) ByIP(_ context.Context, _ string) (orb.Point, error) {
 	return orb.Point{-5.0527, 50.266}, nil
 }
 

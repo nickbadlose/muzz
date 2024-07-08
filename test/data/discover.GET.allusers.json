@@ -8,20 +8,6 @@
       "distanceFromMe": 0
     },
     {
-      "id": 4,
-      "name": "test4",
-      "gender": "female",
-      "age": 40,
-      "distanceFromMe": 371.9400749152127
-    },
-    {
-      "id": 5,
-      "name": "test5",
-      "gender": "female",
-      "age": 25,
-      "distanceFromMe": 376.9843890581312
-    },
-    {
       "id": 6,
       "name": "test6",
       "gender": "male",
