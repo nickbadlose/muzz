@@ -7,6 +7,7 @@ import (
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/database"
 	"github.com/nickbadlose/muzz/internal/logger"
+	"github.com/upper/db/v4"
 )
 
 const (
@@ -32,7 +33,7 @@ type matchEntity struct {
 
 func (ma *MatchAdapter) CreateSwipe(ctx context.Context, in *muzz.CreateSwipeInput) (*muzz.Match, error) {
 	match := &muzz.Match{}
-	err := ma.database.TxContext(ctx, func(tx database.Client) error {
+	err := ma.database.TxContext(ctx, func(tx db.Session) error {
 		swipe, tErr := createSwipeWithTx(ctx, tx.SQL(), in)
 		if tErr != nil {
 			logger.Error(ctx, "creating swipe", tErr)

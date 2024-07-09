@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/database"
@@ -34,14 +35,15 @@ func NewUserAdapter(d *database.Database) *UserAdapter {
 }
 
 type userEntity struct {
-	id       int
-	email    string
-	password string
-	name     string
-	gender   string
-	age      int
-	location orb.Point
-	distance float64
+	id             int
+	email          string
+	password       string
+	name           string
+	gender         string
+	age            int
+	location       orb.Point
+	distance       float64
+	attractiveness float64
 }
 
 func (ua *UserAdapter) CreateUser(ctx context.Context, in *muzz.CreateUserInput) (*muzz.User, error) {
@@ -138,6 +140,8 @@ func (ua *UserAdapter) UserByEmail(ctx context.Context, email string) (*muzz.Use
 //  Exclude already swiped users from results.
 //  Have tie breaker order by column? ID check if that's default anyway
 //  index for swiped user_id (SELECT swiped_user_id FROM swipe WHERE user_id = ?) seed data and analyze before and after indexes for distance, swiped user etc.
+//  Check all make functions and use correct methods ie len or cap with append or [i]
+//  Do we need entities, we are just converting to another object immediately
 
 func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]*muzz.UserDetails, error) {
 	r, err := ua.database.ReadSessionContext(ctx)
@@ -146,34 +150,69 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]
 	}
 
 	columns := []interface{}{
-		"id",
-		"name",
-		"gender",
-		"age",
-		// TODO we are officially directly dependant on the upper lib here. So do we remove abstraction interface and just use lib?
-		db.Raw(`(location::geography <-> ST_SetSRID(ST_MakePoint(?,?),?)::geography) / 1000 AS distance`, in.Location.Lon(), in.Location.Lat(), srid),
+		"u.id",
+		"u.name",
+		"u.gender",
+		"u.age",
+		db.Raw(
+			`(u.location::geography <-> ST_SetSRID(ST_MakePoint(?,?),?)::geography) / 1000 AS distance`,
+			in.Location.Lon(),
+			in.Location.Lat(),
+			srid,
+		),
 	}
+
+	order := muzz.SortTypeDistance.String()
+	if in.SortType == muzz.SortTypeAttractiveness {
+		order = fmt.Sprintf("-%s", muzz.SortTypeAttractiveness.String())
+		columns = append(
+			columns,
+			db.Raw(
+				`NULLIF((SELECT COUNT(swiped_user_id) FROM swipe WHERE 
+swiped_user_id = u.id AND preference = true),0)::float / 
+(SELECT COUNT(swiped_user_id) FROM swipe WHERE swiped_user_id = u.id)::float AS attractiveness`,
+			),
+		)
+	}
+
 	selector := r.Select(columns...).
-		From(userTable).
-		Where("id != ?", in.UserID).
-		And("id NOT IN ?", db.Raw("(SELECT swiped_user_id FROM swipe WHERE user_id = ?)", in.UserID)).
-		OrderBy("distance")
+		From(fmt.Sprintf("%s %s", userTable, "u")).
+		Where("u.id != ?", in.UserID).
+		And("u.id NOT IN ?", db.Raw(`(SELECT swiped_user_id FROM swipe WHERE user_id = ?)`, in.UserID)).
+		OrderBy(order)
 
 	selector = applyUserFilters(in.Filters, selector)
+
+	query := selector.String()
+	fmt.Println(query)
 
 	rows, err := selector.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	entities := make([]*userEntity, 0, 1)
+	users := make([]*muzz.UserDetails, 0, 2)
 	for rows.Next() {
-		entity := new(userEntity)
-		err = rows.Scan(&entity.id, &entity.name, &entity.gender, &entity.age, &entity.distance)
+		user := new(muzz.UserDetails)
+		var genderStr string
+		dest := []any{&user.ID, &user.Name, &genderStr, &user.Age, &user.DistanceFromMe}
+		if in.SortType == muzz.SortTypeAttractiveness {
+			// We need to return this column as we use it to sort, but we have no business case for it
+			pseudoFloat := sql.NullFloat64{}
+			dest = append(dest, &pseudoFloat)
+		}
+		err = rows.Scan(dest...)
 		if err != nil {
 			return nil, err
 		}
-		entities = append(entities, entity)
+
+		gender, ok := muzz.GenderValues[genderStr]
+		if !ok {
+			logger.Warn(ctx, "unsupported gender retrieved from database", zap.String("gender", gender.String()))
+		}
+		user.Gender = gender
+
+		users = append(users, user)
 	}
 
 	if errors.Is(rows.Err(), sql.ErrNoRows) {
@@ -181,22 +220,6 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]
 	}
 	if rows.Err() != nil {
 		return nil, rows.Err()
-	}
-
-	users := make([]*muzz.UserDetails, len(entities))
-	for i, entity := range entities {
-		gender, ok := muzz.GenderValues[entity.gender]
-		if !ok {
-			logger.Warn(ctx, "unsupported gender retrieved from database", zap.String("gender", gender.String()))
-		}
-
-		users[i] = &muzz.UserDetails{
-			ID:             entity.id,
-			Name:           entity.name,
-			Gender:         gender,
-			Age:            entity.age,
-			DistanceFromMe: entity.distance,
-		}
 	}
 
 	return users, nil
@@ -219,17 +242,17 @@ func (ua *UserAdapter) UpdateUserLocation(ctx context.Context, id int, location 
 	return nil
 }
 
-func applyUserFilters(in *muzz.UserFilters, selector database.Selector) database.Selector {
+func applyUserFilters(in *muzz.UserFilters, selector db.Selector) db.Selector {
 	if in == nil {
 		return selector
 	}
 
 	if in.MinAge != 0 {
-		selector = selector.And("age >= ?", in.MinAge)
+		selector = selector.And("u.age >= ?", in.MinAge)
 	}
 
 	if in.MaxAge != 0 {
-		selector = selector.And("age <= ?", in.MaxAge)
+		selector = selector.And("u.age <= ?", in.MaxAge)
 	}
 
 	if len(in.Genders) != 0 {
@@ -237,7 +260,7 @@ func applyUserFilters(in *muzz.UserFilters, selector database.Selector) database
 		for i, gen := range in.Genders {
 			genderStrings[i] = gen.String()
 		}
-		selector = selector.And("gender IN ", genderStrings)
+		selector = selector.And("u.gender IN ", genderStrings)
 	}
 
 	return selector

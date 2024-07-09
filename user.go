@@ -218,9 +218,57 @@ func validatePoint(p orb.Point) error {
 	return nil
 }
 
+// SortType is an enum for a sort type.
+type SortType uint8
+
+const (
+	// SortTypeDistance sorts the distance from the authenticated user.
+	SortTypeDistance SortType = iota
+	// SortTypeAttractiveness sorts users by how attractive they are according to swipes.
+	SortTypeAttractiveness
+)
+
+var (
+	// SortValues maps the sort type string values to the enum values.
+	SortValues = map[string]SortType{
+		"distance":       SortTypeDistance,
+		"attractiveness": SortTypeAttractiveness,
+	}
+	// SortNames maps the sort type enum values to the string values.
+	SortNames = map[SortType]string{
+		SortTypeDistance:       "distance",
+		SortTypeAttractiveness: "attractiveness",
+	}
+)
+
+// String returns a lower-case representation of the SortType.
+func (s SortType) String() string {
+	gender, ok := SortNames[s]
+	if !ok {
+		return fmt.Sprintf("SortType(%d)", s)
+	}
+
+	return gender
+}
+
+// Validate the SortType against the accepted values.
+func (s SortType) Validate() error {
+	_, ok := SortNames[s]
+	if !ok {
+		sortTypes := make([]string, 0, len(SortValues))
+		for name := range SortValues {
+			sortTypes = append(sortTypes, name)
+		}
+		return fmt.Errorf("invalid sort type, valid values are: %s", strings.Join(sortTypes, ", "))
+	}
+
+	return nil
+}
+
 type GetUsersInput struct {
 	UserID   int
 	Location orb.Point
+	SortType SortType
 	Filters  *UserFilters
 }
 
@@ -234,7 +282,6 @@ func (in *GetUsersInput) Validate() error {
 		return err
 	}
 
-	// TODO accept nil filter or not?
 	if in.Filters != nil {
 		return in.Filters.Validate()
 	}

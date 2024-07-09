@@ -331,3 +331,27 @@ func TestGetUsersInput_Validate(t *testing.T) {
 		})
 	}
 }
+
+func TestSortType_Validate(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		require.NoError(t, SortTypeDistance.Validate())
+		require.NoError(t, SortTypeAttractiveness.Validate())
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		gender := SortType(100)
+		require.Error(t, gender.Validate())
+		require.Contains(t, gender.Validate().Error(), "invalid sort type, valid values are:")
+	})
+}
+
+func TestSortType_String(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		require.Equal(t, "distance", SortTypeDistance.String())
+		require.Equal(t, "attractiveness", SortTypeAttractiveness.String())
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		require.Equal(t, "SortType(100)", SortType(100).String())
+	})
+}

@@ -221,6 +221,13 @@ func TestAuthenticated(t *testing.T) {
 			expectedCode: http.StatusOK,
 		},
 		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "sort type attractiveness",
+			queryParams:  "sort=attractiveness",
+			expectedCode: http.StatusOK,
+		},
+		{
 			endpoint:    "swipe",
 			description: "match",
 			method:      http.MethodPost,

@@ -2,22 +2,24 @@ package postgres
 
 import (
 	"context"
+	"testing"
+
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/database"
 	mockdatabase "github.com/nickbadlose/muzz/internal/database/mocks"
 	"github.com/paulmach/orb"
 	"github.com/stretchr/testify/require"
-	"testing"
+	"github.com/upper/db/v4"
 )
 
 func newTestDB(t *testing.T) (*database.Database, sqlmock.Sqlmock) {
 	dbClient, mockSQL, err := mockdatabase.NewWrappedMock()
 
-	db, err := database.New(
+	dbase, err := database.New(
 		context.Background(),
 		&database.Config{},
-		func(_ context.Context, _ *database.Config) (database.Client, error) {
+		func(_ context.Context, _ *database.Config) (db.Session, error) {
 			return dbClient, err
 		},
 	)
@@ -28,15 +30,15 @@ func newTestDB(t *testing.T) (*database.Database, sqlmock.Sqlmock) {
 
 	t.Cleanup(func() {
 		mockSQL.ExpectClose()
-		require.NoError(t, db.Close())
+		require.NoError(t, dbase.Close())
 	})
 
-	return db, mockSQL
+	return dbase, mockSQL
 }
 
 func newTestUserAdapter(t *testing.T) (*UserAdapter, sqlmock.Sqlmock) {
-	db, mock := newTestDB(t)
-	return NewUserAdapter(db), mock
+	dbase, mock := newTestDB(t)
+	return NewUserAdapter(dbase), mock
 }
 
 func TestUserAdapter_CreateUser(t *testing.T) {

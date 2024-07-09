@@ -2,13 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
-	"net/http"
-
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/logger"
 	"github.com/paulmach/orb"
+	"net/http"
 )
 
 // CreateUserRequest holds the information required to create a user.
@@ -140,6 +139,12 @@ func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sortType := muzz.SortTypeDistance
+	sort := r.URL.Query().Get("sort")
+	if sort != "" {
+		sortType = muzz.SortValues[sort]
+	}
+
 	location, err := h.location.ByIP(r.Context(), r.RemoteAddr)
 	if err != nil {
 		err = render.Render(w, r, apperror.InternalServerHTTP(err))
@@ -150,6 +155,7 @@ func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 	appUsers, aErr := h.userService.Discover(r.Context(), &muzz.GetUsersInput{
 		UserID:   userID,
 		Location: location,
+		SortType: sortType,
 		Filters:  filters,
 	})
 	if aErr != nil {

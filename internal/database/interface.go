@@ -7,50 +7,15 @@ import (
 	"github.com/upper/db/v4"
 )
 
-// type aliases allow us to loosely decouple from the upper/db lib.
-type (
-	// Selector represents a SELECT statement.
-	Selector = db.Selector
-	// Updater represents an UPDATE statement.
-	Updater = db.Updater
-	// Inserter represents an INSERT statement.
-	Inserter = db.Inserter
-	// Deleter represents a DELETE statement.
-	Deleter = db.Deleter
-	// Iterator provides methods for iterating over query results.
-	Iterator = db.Iterator
-	// SQL defines methods that can be used to build a SQL query with chainable
-	// method calls.
-	//
-	// Queries are immutable, so every call to any method will return a new
-	// pointer, if you want to build a query using variables you need to reassign
-	// them, like this:
-	//
-	//	a = builder.Select("name").From("foo") // "a" is created
-	//
-	//	a.Where(...) // No effect, the value returned from Where is ignored.
-	//
-	//	a = a.Where(...) // "a" is reassigned and points to a different address.
-	SQL = db.SQL
-)
-
-type Client interface {
-	SQL() db.SQL
-	TxContext(ctx context.Context, fn func(tx Client) error, opts *sql.TxOptions) error
-	WithContext(ctx context.Context) Client
-	Ping() error
-	Close() error
-}
-
 // Writer interface which only allows write operations.
 type Writer interface {
 	Preparer
 
 	// InsertInto prepares and returns an Inserter targeted at the given table.
-	InsertInto(string) Inserter
+	InsertInto(string) db.Inserter
 
 	// Update prepares and returns an Updater targeted at the given table.
-	Update(string) Updater
+	Update(string) db.Updater
 }
 
 // Preparer generic operations shared between reading and writing.
@@ -73,11 +38,11 @@ type Reader interface {
 	//
 	// The returned Selector does not initially point to any table, a call to
 	// From() is required after Select() to complete a valid query.
-	Select(columns ...interface{}) Selector
+	Select(columns ...interface{}) db.Selector
 
 	// SelectFrom creates a Selector that selects all columns (like SELECT *)
 	// from the given table.
-	SelectFrom(table ...interface{}) Selector
+	SelectFrom(table ...interface{}) db.Selector
 
 	// QueryContext executes a SQL query that returns rows, like
 	// sql.QueryContext.

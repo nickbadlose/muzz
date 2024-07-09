@@ -2,13 +2,13 @@ package mockdatabase
 
 import (
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/nickbadlose/muzz/internal/database"
+	"github.com/upper/db/v4"
 	"github.com/upper/db/v4/adapter/postgresql"
 )
 
 // NewWrappedMock returns a new mocked DB wrapped in the upper query builder for testing.
-func NewWrappedMock() (database.Client, sqlmock.Sqlmock, error) {
-	db, mockSQL, err := sqlmock.New()
+func NewWrappedMock() (db.Session, sqlmock.Sqlmock, error) {
+	database, mockSQL, err := sqlmock.New()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -17,10 +17,10 @@ func NewWrappedMock() (database.Client, sqlmock.Sqlmock, error) {
 		WillReturnRows(
 			sqlmock.NewRows([]string{`name`}).AddRow(`mock`),
 		)
-	session, err := postgresql.New(db)
+	session, err := postgresql.New(database)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	return database.WrapSession(session), mockSQL, mockSQL.ExpectationsWereMet()
+	return session, mockSQL, mockSQL.ExpectationsWereMet()
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/upper/db/v4"
 	"github.com/upper/db/v4/adapter/postgresql"
 )
 
@@ -41,7 +42,7 @@ type Config struct {
 }
 
 // Database creates sessions for the client to interact with.
-type Database struct{ client Client }
+type Database struct{ client db.Session }
 
 // ReadSessionContext returns the current database read session.
 func (d Database) ReadSessionContext(ctx context.Context) (Reader, error) {
@@ -60,7 +61,7 @@ func (d Database) WriteSessionContext(ctx context.Context) (Writer, error) {
 }
 
 // TxContext performs the provided transaction func against the database.
-func (d Database) TxContext(ctx context.Context, fn func(tx Client) error, opts *sql.TxOptions) error {
+func (d Database) TxContext(ctx context.Context, fn func(tx db.Session) error, opts *sql.TxOptions) error {
 	if d.client == nil {
 		return errNoConnection
 	}
@@ -84,7 +85,7 @@ func (d Database) Close() error {
 }
 
 // New instantiates a new Database and opens a connection via the defaultClientFunc.
-func New(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (Client, error)) (*Database, error) {
+func New(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (db.Session, error)) (*Database, error) {
 	client, err := openConnection(ctx, cfg, fn...)
 
 	return &Database{client: client}, err
@@ -92,7 +93,7 @@ func New(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) 
 
 // openConnection opens a new connection to the database using the supplied
 // username u and password p.
-func openConnection(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (Client, error)) (Client, error) {
+func openConnection(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (db.Session, error)) (db.Session, error) {
 	var dft = defaultClientFunc
 	if len(fn) > 0 {
 		dft = fn[0]
@@ -101,7 +102,7 @@ func openConnection(ctx context.Context, cfg *Config, fn ...func(context.Context
 	return dft(ctx, cfg)
 }
 
-var defaultClientFunc = func(ctx context.Context, cfg *Config) (Client, error) {
+var defaultClientFunc = func(ctx context.Context, cfg *Config) (db.Session, error) {
 	db, err := sql.Open(
 		databaseDriver,
 		fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=disable", databaseDriver, cfg.Username, cfg.Password, cfg.Host, cfg.Name),
@@ -121,5 +122,5 @@ var defaultClientFunc = func(ctx context.Context, cfg *Config) (Client, error) {
 	conn.SetMaxOpenConns(maxOpenConnections)
 	conn.SetConnMaxLifetime(maxConnLifetime)
 
-	return WrapSession(conn), nil
+	return conn, nil
 }
