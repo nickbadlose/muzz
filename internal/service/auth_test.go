@@ -48,17 +48,6 @@ func TestAuthService_Login(t *testing.T) {
 		)
 		require.Nil(t, err)
 		require.NotEmpty(t, got)
-
-		// TODO test claims in auth package, not here.
-		//claims := &auth.Claims{}
-		//tkn, pErr := jwt.ParseWithClaims(got, claims, func(token *jwt.Token) (interface{}, error) {
-		//	return []byte("test"), nil
-		//})
-		//require.NoError(t, pErr)
-		//require.Equal(t, 1, claims.UserID)
-		//require.Equal(t, "https://test.com", claims.Issuer)
-		//require.Equal(t, jwt.ClaimStrings{"https://test.com"}, claims.Audience)
-		//require.True(t, tkn.Valid)
 	})
 
 	errCases := []struct {

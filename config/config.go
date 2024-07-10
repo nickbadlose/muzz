@@ -1,9 +1,12 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
+	"path"
+	"runtime"
 	"time"
 
 	"github.com/spf13/viper"
@@ -22,8 +25,8 @@ const (
 	cfgJWTSecret        = "JWT_SECRET"
 	cfgGeoIpEndpoint    = "GEOIP_ENDPOINT"
 	cfgGeoIpAPIKey      = "GEOIP_API_KEY"
-	cfgCachePassword    = "CACHE_PASSWORD"
 	cfgCacheHost        = "CACHE_HOST"
+	cfgCachePassword    = "CACHE_PASSWORD"
 	cfgJaegerHost       = "JAEGER_HOST"
 	cfgDebugEnabled     = "DEBUG_ENABLED"
 
@@ -39,7 +42,12 @@ var requiredEnv = []string{
 	cfgDatabasePassword,
 	cfgDatabase,
 	cfgDomainName,
-	cfgJWTDuration,
+	cfgJWTSecret,
+	cfgGeoIpEndpoint,
+	cfgGeoIpAPIKey,
+	cfgCacheHost,
+	cfgCachePassword,
+	cfgJaegerHost,
 }
 
 type Config struct{}
@@ -57,22 +65,22 @@ func (cfg *Config) Port() string {
 }
 
 // DatabaseHost retrieves the host of the database to connect to.
-func (cfg *Config) DatabaseHost() string { return viper.GetString(cfgDatabaseHost) }
+func (cfg *Config) DatabaseHost() string { return mustString(cfgDatabaseHost) }
 
 // DatabaseUser retrieves the database user to authenticate with.
-func (cfg *Config) DatabaseUser() string { return viper.GetString(cfgDatabaseUser) }
+func (cfg *Config) DatabaseUser() string { return mustString(cfgDatabaseUser) }
 
 // DatabasePassword retrieves the database password to authenticate with.
-func (cfg *Config) DatabasePassword() string { return viper.GetString(cfgDatabasePassword) }
+func (cfg *Config) DatabasePassword() string { return mustString(cfgDatabasePassword) }
 
 // Database retrieves the database to connect to.
-func (cfg *Config) Database() string { return viper.GetString(cfgDatabase) }
+func (cfg *Config) Database() string { return mustString(cfgDatabase) }
 
 // LogLevel retrieves the application log level to run.
 func (cfg *Config) LogLevel() string { return viper.GetString(cfgLogLevel) }
 
 // DomainName retrieves the domain name that the server is hosted on.
-func (cfg *Config) DomainName() string { return viper.GetString(cfgDomainName) }
+func (cfg *Config) DomainName() string { return mustString(cfgDomainName) }
 
 // JWTDuration retrieves the expiry duration for JWTs.
 func (cfg *Config) JWTDuration() time.Duration {
@@ -84,22 +92,22 @@ func (cfg *Config) JWTDuration() time.Duration {
 }
 
 // JWTSecret retrieves the JWT secret to sign JWTs with.
-func (cfg *Config) JWTSecret() string { return viper.GetString(cfgJWTSecret) }
+func (cfg *Config) JWTSecret() string { return mustString(cfgJWTSecret) }
 
 // GeoIPAPIKey retrieves the API key for the geoip service..
-func (cfg *Config) GeoIPAPIKey() string { return viper.GetString(cfgGeoIpAPIKey) }
+func (cfg *Config) GeoIPAPIKey() string { return mustString(cfgGeoIpAPIKey) }
 
 // GeoIPEndpoint retrieves the endpoint for the geoip service..
-func (cfg *Config) GeoIPEndpoint() string { return viper.GetString(cfgGeoIpEndpoint) }
+func (cfg *Config) GeoIPEndpoint() string { return mustString(cfgGeoIpEndpoint) }
 
 // CacheHost retrieves the cache host to connect to.
-func (cfg *Config) CacheHost() string { return viper.GetString(cfgCacheHost) }
+func (cfg *Config) CacheHost() string { return mustString(cfgCacheHost) }
 
 // CachePassword retrieves the cache password to authenticate with.
-func (cfg *Config) CachePassword() string { return viper.GetString(cfgCachePassword) }
+func (cfg *Config) CachePassword() string { return mustString(cfgCachePassword) }
 
 // JaegerHost retrieves the jaeger tracing host to deliver traces to.
-func (cfg *Config) JaegerHost() string { return viper.GetString(cfgJaegerHost) }
+func (cfg *Config) JaegerHost() string { return mustString(cfgJaegerHost) }
 
 // DebugEnabled retrieves the application debug configuration.
 func (cfg *Config) DebugEnabled() bool { return viper.GetBool(cfgDebugEnabled) }
@@ -128,8 +136,13 @@ func Load() (*Config, error) {
 	env := getEnv()
 	viper.AutomaticEnv()
 
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return nil, errors.New("unable to get caller information")
+	}
+
 	// env files aren't used in production.
-	viper.AddConfigPath(".")
+	viper.AddConfigPath(fmt.Sprintf("%s/../", path.Dir(filename)))
 	viper.SetConfigName(env)
 	viper.SetConfigType("env")
 	err := viper.ReadInConfig()
@@ -150,4 +163,13 @@ func getEnv() string {
 		env = defaultEnv
 	}
 	return env
+}
+
+func mustString(k string) string {
+	v := viper.GetString(k)
+	if v == "" {
+		log.Fatalf("could not find config value for: %v", k)
+	}
+
+	return v
 }

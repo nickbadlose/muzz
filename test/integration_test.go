@@ -32,6 +32,7 @@ import (
 
 // TODO
 //  - have migrations_test.go file in here which test constraints etc.
+//  - try t.parallel to speed these up, I think it might fail if all accessing same db, is there a way to fix that?
 
 // mockLocation to mock getting the location from IP address. This is the only part of our integration tests we mock,
 // so we don't spam the geoip service.
@@ -44,9 +45,12 @@ func (*mockLocation) ByIP(_ context.Context, _ string) (orb.Point, error) {
 }
 
 func newTestServer(t *testing.T) *httptest.Server {
-	db := setupDB(t)
 	cfg, err := config.Load()
 	require.NoError(t, err)
+
+	fmt.Println(cfg.DatabaseUser(), cfg.DatabasePassword())
+
+	db := setupDB(t, cfg)
 	matchAdapter := postgres.NewMatchAdapter(db)
 	userAdapter := postgres.NewUserAdapter(db)
 
@@ -67,15 +71,19 @@ func newTestServer(t *testing.T) *httptest.Server {
 	return srv
 }
 
-func setupDB(t *testing.T) *database.Database {
+func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	// TODO don't continue on errorNoChange, it means some migrations haven't run correctly?
 
-	// TODO auth from cfg
 	// create test DB migrator to set up and teardown test db.
 	// You can't drop a database whilst connections still exist, so we authenticate to the postgres DB to run these.
 	createTestDBMigrator, err := migrate.New(
 		"file://./migrations/create",
-		"postgres://nickbadlose:password@localhost:5432/postgres?sslmode=disable",
+		fmt.Sprintf(
+			"postgres://%s:%s@%s/postgres?sslmode=disable",
+			cfg.DatabaseUser(),
+			cfg.DatabasePassword(),
+			cfg.DatabaseHost(),
+		),
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -93,12 +101,16 @@ func setupDB(t *testing.T) *database.Database {
 		require.NoError(t, err)
 	}
 
-	// TODO get auth from env
 	// TODO run appMigrator.Drop at the start of each migration to clear all data if db already existed
 	// app migrator to run all application migrations.
 	appMigrator, err := migrate.New(
 		"file://../migrations",
-		"postgres://nickbadlose:password@localhost:5432/test?sslmode=disable",
+		fmt.Sprintf(
+			"postgres://%s:%s@%s/test?sslmode=disable",
+			cfg.DatabaseUser(),
+			cfg.DatabasePassword(),
+			cfg.DatabaseHost(),
+		),
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -120,7 +132,12 @@ func setupDB(t *testing.T) *database.Database {
 	// https://github.com/golang-migrate/migrate/issues/395#issuecomment-867133636
 	seedMigrator, err := migrate.New(
 		"file://./migrations/seed",
-		"postgres://nickbadlose:password@localhost:5432/test?sslmode=disable&x-migrations-table=schema_seed_migrations",
+		fmt.Sprintf(
+			"postgres://%s:%s@%s/test?sslmode=disable&x-migrations-table=schema_seed_migrations",
+			cfg.DatabaseUser(),
+			cfg.DatabasePassword(),
+			cfg.DatabaseHost(),
+		),
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -137,12 +154,11 @@ func setupDB(t *testing.T) *database.Database {
 		require.NoError(t, err)
 	}
 
-	// TODO auth from cfg
 	db, err := database.New(context.Background(), &database.Credentials{
-		Username: "nickbadlose",
-		Password: "password",
+		Username: cfg.DatabaseUser(),
+		Password: cfg.DatabasePassword(),
 		Name:     "test",
-		Host:     "localhost:5432",
+		Host:     cfg.DatabaseHost(),
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
