@@ -28,23 +28,25 @@ func NewMatchAdapter(d *database.Database) *MatchAdapter {
 }
 
 type matchEntity struct {
-	id, userID, matchedUserID int
+	ID            int `db:"id"`
+	UserID        int `db:"user_id"`
+	MatchedUserID int `db:"matched_user_id"`
 }
 
 func (ma *MatchAdapter) CreateSwipe(ctx context.Context, in *muzz.CreateSwipeInput) (*muzz.Match, error) {
 	match := &muzz.Match{}
 	err := ma.database.TxContext(ctx, func(tx db.Session) error {
-		swipe, tErr := createSwipeWithTx(ctx, tx.SQL(), in)
+		swipeInserted, tErr := createSwipeWithTx(ctx, tx.SQL(), in)
 		if tErr != nil {
 			logger.Error(ctx, "creating swipe", tErr)
 			return tErr
 		}
 
-		if !swipe.preference {
+		if !swipeInserted.preference {
 			return nil
 		}
 
-		swipe, tErr = getSwipeWithTx(ctx, tx.SQL(), in.SwipedUserID, in.UserID)
+		swipeRetrieved, tErr := getSwipeWithTx(ctx, tx.SQL(), swipeInserted.swipedUserID, swipeInserted.userID)
 		if tErr != nil {
 			if errors.Is(tErr, sql.ErrNoRows) {
 				return nil
@@ -54,54 +56,33 @@ func (ma *MatchAdapter) CreateSwipe(ctx context.Context, in *muzz.CreateSwipeInp
 			return tErr
 		}
 
-		if !swipe.preference {
+		if !swipeRetrieved.preference {
 			return nil
 		}
 
-		// TODO
-		//  batch insert matches if using 2 rows for one match
-		//  have createMatchWithTx take in multiple cmis
-
-		cmi := &muzz.CreateMatchInput{
-			UserID:        in.UserID,
-			MatchedUserID: in.SwipedUserID,
+		cmi := []*muzz.CreateMatchInput{
+			{
+				UserID:        swipeInserted.userID,
+				MatchedUserID: swipeInserted.swipedUserID,
+			},
+			{
+				UserID:        swipeRetrieved.userID,
+				MatchedUserID: swipeRetrieved.swipedUserID,
+			},
 		}
-		tErr = cmi.Validate()
-		if tErr != nil {
-			logger.Error(ctx, "validating create match input", tErr)
-			return tErr
-		}
-
-		matchEnt, tErr := createMatchWithTx(ctx, tx.SQL(), cmi)
+		matches, tErr := createMatchWithTx(ctx, tx.SQL(), cmi)
 		if tErr != nil {
 			logger.Error(ctx, "creating first match record", tErr)
 			return tErr
 		}
 
-		cmi = &muzz.CreateMatchInput{
-			UserID:        in.SwipedUserID,
-			MatchedUserID: in.UserID,
-		}
-		tErr = cmi.Validate()
-		if tErr != nil {
-			logger.Error(ctx, "validating create match input", tErr)
-			return tErr
-		}
-
-		_, tErr = createMatchWithTx(ctx, tx.SQL(), cmi)
-		if tErr != nil {
-			logger.Error(ctx, "creating second match record", tErr)
-			return tErr
-		}
-
 		match = &muzz.Match{
-			ID:            matchEnt.id,
-			MatchedUserID: matchEnt.matchedUserID,
+			ID:            matches[0].ID,
+			MatchedUserID: matches[0].MatchedUserID,
 			Matched:       true,
 		}
 
 		return nil
-		//	TODO set these ?
 	}, &sql.TxOptions{})
 	if err != nil {
 		return nil, err
@@ -110,22 +91,42 @@ func (ma *MatchAdapter) CreateSwipe(ctx context.Context, in *muzz.CreateSwipeInp
 	return match, nil
 }
 
-func createMatchWithTx(ctx context.Context, w database.Writer, in *muzz.CreateMatchInput) (*matchEntity, error) {
+func createMatchWithTx(ctx context.Context, tx database.Writer, in []*muzz.CreateMatchInput) ([]*matchEntity, error) {
 	columns := []string{"id", "user_id", "matched_user_id"}
-	row, err := w.InsertInto(matchTable).
+
+	bi := tx.InsertInto(matchTable).
 		Columns(columns[1:]...).
-		Values(in.UserID, in.MatchedUserID).
 		Returning(columns...).
-		QueryRowContext(ctx)
-	if err != nil {
-		return nil, err
+		Batch(len(in))
+
+	for _, cmi := range in {
+		err := cmi.Validate()
+		if err != nil {
+			logger.Error(ctx, "validating create match input", err)
+			return nil, err
+		}
+
+		bi.Values(
+			cmi.UserID,
+			cmi.MatchedUserID,
+		)
 	}
 
-	entity := new(matchEntity)
-	err = row.Scan(&entity.id, &entity.userID, &entity.matchedUserID)
-	if err != nil {
-		return nil, err
+	bi.Done()
+
+	out := make([]*matchEntity, 0, len(in))
+	for {
+		batch := make([]*matchEntity, 0, len(in))
+		if err := bi.Err(); err != nil {
+			logger.Error(ctx, "batch inserting matches", err)
+			return nil, err
+		}
+		if bi.NextResult(&batch) {
+			out = append(out, batch...)
+			continue
+		}
+		break
 	}
 
-	return entity, nil
+	return out, bi.Wait()
 }

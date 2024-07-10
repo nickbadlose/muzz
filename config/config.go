@@ -98,7 +98,10 @@ func (cfg *Config) CachePassword() string { return viper.GetString(cfgCachePassw
 
 // MustLoad calls Load and makes a call to log.Fatal if any required env vars haven't been set.
 func MustLoad() *Config {
-	cfg := Load()
+	cfg, err := Load()
+	if err != nil {
+		log.Fatalf("loading config: %s", err)
+	}
 
 	// check if required env vars are set.
 	for _, key := range requiredEnv {
@@ -113,7 +116,7 @@ func MustLoad() *Config {
 
 // Load the environment into the viper package and returns a new Config interface to retrieve env vars. The env is
 // configured from a root level "<environment>.env" file and then overwriting with environment variables.
-func Load() *Config {
+func Load() (*Config, error) {
 	env := getEnv()
 	viper.AutomaticEnv()
 
@@ -126,11 +129,11 @@ func Load() *Config {
 		// this is the viper recommended way to check if the error is from no env file found.
 		// https://github.com/spf13/viper?tab=readme-ov-file#reading-config-files
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			log.Fatalf("reading env file: %s", err)
+			return nil, err
 		}
 	}
 
-	return &Config{}
+	return &Config{}, nil
 }
 
 func getEnv() string {

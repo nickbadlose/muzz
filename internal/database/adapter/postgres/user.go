@@ -154,6 +154,7 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]
 		"u.name",
 		"u.gender",
 		"u.age",
+		// TODO remove location cast to geography?
 		db.Raw(
 			`(u.location::geography <-> ST_SetSRID(ST_MakePoint(?,?),?)::geography) / 1000 AS distance`,
 			in.Location.Lon(),
@@ -162,9 +163,9 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]
 		),
 	}
 
-	order := muzz.SortTypeDistance.String()
+	order := in.SortType.String()
 	if in.SortType == muzz.SortTypeAttractiveness {
-		order = fmt.Sprintf("-%s", muzz.SortTypeAttractiveness.String())
+		order = "-" + order
 		columns = append(
 			columns,
 			db.Raw(
@@ -183,24 +184,26 @@ swiped_user_id = u.id AND preference = true),0)::float /
 
 	selector = applyUserFilters(in.Filters, selector)
 
-	query := selector.String()
-	fmt.Println(query)
-
 	rows, err := selector.QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		logger.MaybeError(ctx, "closing db rows", rows.Close())
+	}()
 
 	users := make([]*muzz.UserDetails, 0, 2)
 	for rows.Next() {
 		user := new(muzz.UserDetails)
 		var genderStr string
 		dest := []any{&user.ID, &user.Name, &genderStr, &user.Age, &user.DistanceFromMe}
+
 		if in.SortType == muzz.SortTypeAttractiveness {
 			// We need to return this column as we use it to sort, but we have no business case for it
 			pseudoFloat := sql.NullFloat64{}
 			dest = append(dest, &pseudoFloat)
 		}
+
 		err = rows.Scan(dest...)
 		if err != nil {
 			return nil, err
@@ -215,11 +218,12 @@ swiped_user_id = u.id AND preference = true),0)::float /
 		users = append(users, user)
 	}
 
-	if errors.Is(rows.Err(), sql.ErrNoRows) {
-		return nil, apperror.NoResults
-	}
 	if rows.Err() != nil {
 		return nil, rows.Err()
+	}
+
+	if len(users) == 0 {
+		return nil, apperror.NoResults
 	}
 
 	return users, nil

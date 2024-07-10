@@ -29,3 +29,17 @@ func WithLogLevelString(s string) Option {
 		cfg.Level = zap.NewAtomicLevelAt(l)
 	})
 }
+
+// ReplaceOutputPaths replaces custom output paths to the logger.
+func ReplaceOutputPaths(paths ...string) Option {
+	return optionFunc(func(cfg *zap.Config) {
+		cfg.OutputPaths = paths
+	})
+}
+
+// ReplaceErrorOutputPaths replaces custom output error paths to the logger.
+func ReplaceErrorOutputPaths(paths ...string) Option {
+	return optionFunc(func(cfg *zap.Config) {
+		cfg.ErrorOutputPaths = paths
+	})
+}

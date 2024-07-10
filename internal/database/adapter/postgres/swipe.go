@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/database"
 )

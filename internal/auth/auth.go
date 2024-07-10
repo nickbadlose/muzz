@@ -69,12 +69,8 @@ func (a *Authorizer) Authenticate(user *muzz.User, password string) (string, *ap
 // Authorize parses and authorizes the given request JWT, extracts the Claims and authorizes them,
 // returning the userID once successfully authorized.
 func (a *Authorizer) Authorize(token string) (int, *apperror.Error) {
-	// TODO see what other errors we can get.
-	//  See if when passing claims, if an incorrect claims format fails somewhere.
-	//  See what other errors can be returned from parse and handle appropriately
 	c := &Claims{}
 	tkn, err := jwt.ParseWithClaims(token, c, func(token *jwt.Token) (interface{}, error) {
-		// TODO see what we hit if pass a string out of here
 		return []byte(a.config.JWTSecret()), nil
 	})
 	if err != nil {
@@ -82,10 +78,9 @@ func (a *Authorizer) Authorize(token string) (int, *apperror.Error) {
 			return 0, apperror.Unauthorised(err)
 		}
 
-		return 0, apperror.BadInput(err)
+		return 0, apperror.Internal(err)
 	}
 
-	// TODO check this
 	_, ok := tkn.Claims.(*Claims)
 	if !ok {
 		return 0, apperror.Unauthorised(errors.New("unknown claims type"))
@@ -109,8 +104,10 @@ func (a *Authorizer) validateClaims(c *Claims) error {
 		return errors.New("token has no user associated with it")
 	}
 
+	dur := a.config.JWTDuration()
+
 	t := time.Now().UTC()
-	if c.IssuedAt.Add(a.config.JWTDuration()).Before(t) {
+	if c.IssuedAt.Add(dur).Before(t) {
 		return jwt.ErrTokenExpired
 	}
 

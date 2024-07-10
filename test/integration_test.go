@@ -44,7 +44,8 @@ func (*mockLocation) ByIP(_ context.Context, _ string) (orb.Point, error) {
 
 func newTestServer(t *testing.T) *httptest.Server {
 	db := setupDB(t)
-	cfg := config.Load()
+	cfg, err := config.Load()
+	require.NoError(t, err)
 	matchAdapter := postgres.NewMatchAdapter(db)
 	userAdapter := postgres.NewUserAdapter(db)
 

@@ -11,21 +11,13 @@ import (
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/auth"
 	mockservice "github.com/nickbadlose/muzz/internal/service/mocks"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-// TODO edit auth package
-
-func init() {
-	viper.Set("DOMAIN_NAME", "https://test.com")
-	viper.Set("JWT_DURATION", "12h")
-	viper.Set("JWT_SECRET", "test")
-}
-
-func newTestAuthService(m *mockservice.AuthRepository) *AuthService {
-	cfg := config.Load()
+func newTestAuthService(t *testing.T, m *mockservice.AuthRepository) *AuthService {
+	cfg, err := config.Load()
+	require.NoError(t, err)
 	a := auth.NewAuthorizer(cfg)
 	return NewAuthService(m, a)
 }
@@ -33,7 +25,7 @@ func newTestAuthService(m *mockservice.AuthRepository) *AuthService {
 func TestAuthService_Login(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		m := mockservice.NewAuthRepository(t)
-		sut := newTestAuthService(m)
+		sut := newTestAuthService(t, m)
 
 		m.EXPECT().
 			UserByEmail(mock.Anything, "test@test.com").Once().Return(
@@ -146,7 +138,7 @@ func TestAuthService_Login(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewAuthRepository(t)
 			tc.setupMockRepo(m)
-			sut := newTestAuthService(m)
+			sut := newTestAuthService(t, m)
 
 			got, err := sut.Login(context.Background(), tc.input)
 			require.Empty(t, got)
