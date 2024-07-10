@@ -21,10 +21,10 @@ func newTestDB(t *testing.T) (*database.Database, sqlmock.Sqlmock) {
 
 	dbase, err := database.New(
 		context.Background(),
-		&database.Config{},
-		func(_ context.Context, _ *database.Config) (db.Session, error) {
+		&database.Credentials{},
+		database.WithClientFunc(func(_ context.Context, _ *database.Config) (db.Session, error) {
 			return dbClient, err
-		},
+		}),
 	)
 
 	if err != nil {

@@ -24,6 +24,8 @@ const (
 	cfgGeoIpAPIKey      = "GEOIP_API_KEY"
 	cfgCachePassword    = "CACHE_PASSWORD"
 	cfgCacheHost        = "CACHE_HOST"
+	cfgJaegerHost       = "JAEGER_HOST"
+	cfgDebugEnabled     = "DEBUG_ENABLED"
 
 	// defaults
 	defaultEnv         = "development"
@@ -95,6 +97,12 @@ func (cfg *Config) CacheHost() string { return viper.GetString(cfgCacheHost) }
 
 // CachePassword retrieves the cache password to authenticate with.
 func (cfg *Config) CachePassword() string { return viper.GetString(cfgCachePassword) }
+
+// JaegerHost retrieves the jaeger tracing host to deliver traces to.
+func (cfg *Config) JaegerHost() string { return viper.GetString(cfgJaegerHost) }
+
+// DebugEnabled retrieves the application debug configuration.
+func (cfg *Config) DebugEnabled() bool { return viper.GetBool(cfgDebugEnabled) }
 
 // MustLoad calls Load and makes a call to log.Fatal if any required env vars haven't been set.
 func MustLoad() *Config {

@@ -25,6 +25,7 @@ import (
 	"github.com/nickbadlose/muzz/internal/database"
 	"github.com/nickbadlose/muzz/internal/database/adapter/postgres"
 	"github.com/nickbadlose/muzz/internal/service"
+	"github.com/nickbadlose/muzz/internal/tracer"
 	"github.com/paulmach/orb"
 	"github.com/stretchr/testify/require"
 )
@@ -57,7 +58,10 @@ func newTestServer(t *testing.T) *httptest.Server {
 
 	hlr := handlers.New(authorizer, &mockLocation{}, authService, userService, matchService)
 
-	srv := httptest.NewServer(router.New(hlr, authorizer))
+	tp, err := tracer.New(context.Background(), cfg, "muzz")
+	require.NoError(t, err)
+
+	srv := httptest.NewServer(router.New(hlr, authorizer, tp))
 	t.Cleanup(srv.Close)
 
 	return srv
@@ -134,7 +138,7 @@ func setupDB(t *testing.T) *database.Database {
 	}
 
 	// TODO auth from cfg
-	db, err := database.New(context.Background(), &database.Config{
+	db, err := database.New(context.Background(), &database.Credentials{
 		Username: "nickbadlose",
 		Password: "password",
 		Name:     "test",

@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/nickbadlose/muzz/internal/cache"
-	"github.com/nickbadlose/muzz/internal/location"
 	"log"
 	"net/http"
 	"os"
@@ -15,10 +13,13 @@ import (
 	"github.com/nickbadlose/muzz/api/router"
 	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/auth"
+	internalcache "github.com/nickbadlose/muzz/internal/cache"
 	"github.com/nickbadlose/muzz/internal/database"
 	"github.com/nickbadlose/muzz/internal/database/adapter/postgres"
+	"github.com/nickbadlose/muzz/internal/location"
 	"github.com/nickbadlose/muzz/internal/logger"
 	"github.com/nickbadlose/muzz/internal/service"
+	"github.com/nickbadlose/muzz/internal/tracer"
 )
 
 const (
@@ -40,18 +41,35 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
-	db, err := database.New(ctx, &database.Config{
-		Username:     cfg.DatabaseUser(),
-		Password:     cfg.DatabasePassword(),
-		Name:         cfg.Database(),
-		Host:         cfg.DatabaseHost(),
-		DebugEnabled: false,
-	})
+	tp, err := tracer.New(ctx, cfg, "muzz")
+	if err != nil {
+		log.Fatalf("failed to initialize tracer: %s", err)
+	}
+
+	db, err := database.New(
+		ctx,
+		&database.Credentials{
+			Username: cfg.DatabaseUser(),
+			Password: cfg.DatabasePassword(),
+			Name:     cfg.Database(),
+			Host:     cfg.DatabaseHost(),
+		},
+		database.WithDebugMode(cfg.DebugEnabled()),
+		database.WithTraceProvider(tp),
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize database: %s", err)
 	}
 
-	c, err := cache.New(ctx, cfg.CachePassword(), cfg.CacheHost())
+	cache, err := internalcache.New(
+		ctx,
+		&internalcache.Credentials{
+			Host:     cfg.CacheHost(),
+			Password: cfg.CachePassword(),
+		},
+		internalcache.WithDebugMode(cfg.DebugEnabled()),
+		internalcache.WithTraceProvider(tp),
+	)
 	if err != nil {
 		log.Fatalf("failed to initialize cache: %s", err)
 	}
@@ -60,7 +78,7 @@ func main() {
 	userAdapter := postgres.NewUserAdapter(db)
 
 	authorizer := auth.NewAuthorizer(cfg)
-	loc := location.New(cfg, c)
+	loc := location.New(cfg, cache)
 
 	authService := service.NewAuthService(userAdapter, authorizer)
 	matchService := service.NewMatchService(matchAdapter)
@@ -70,7 +88,7 @@ func main() {
 
 	// TODO server configuration
 	server := &http.Server{
-		Handler: router.New(hlr, authorizer),
+		Handler: router.New(hlr, authorizer, tp),
 		Addr:    cfg.Port(),
 	}
 
@@ -89,6 +107,10 @@ func main() {
 	err = server.Shutdown(timeoutCtx)
 	if err != nil {
 		log.Fatalf("shutting down server: %s", err)
+	}
+	err = cache.Close()
+	if err != nil {
+		log.Fatalf("closing cache: %s", err)
 	}
 	err = db.Close()
 	if err != nil {

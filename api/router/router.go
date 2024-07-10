@@ -1,6 +1,8 @@
 package router
 
 import (
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -11,7 +13,7 @@ import (
 	httpMiddleware "github.com/nickbadlose/muzz/internal/middleware/http"
 )
 
-func New(h *handlers.Handlers, v *auth.Authorizer) http.Handler {
+func New(h *handlers.Handlers, v *auth.Authorizer, tp trace.TracerProvider) http.Handler {
 	r := chi.NewRouter()
 
 	// TODO
@@ -21,6 +23,7 @@ func New(h *handlers.Handlers, v *auth.Authorizer) http.Handler {
 	//  - use timestamps for migrations
 
 	r.Use(
+		httpMiddleware.NewTraceMiddleware(tp),
 		middleware.AllowContentType("application/json"),
 		middleware.RealIP,
 		middleware.Logger, // TODO custom logger?
@@ -47,5 +50,5 @@ func New(h *handlers.Handlers, v *auth.Authorizer) http.Handler {
 		r.Post("/swipe", h.Swipe)
 	})
 
-	return r
+	return otelhttp.NewHandler(r, "router")
 }

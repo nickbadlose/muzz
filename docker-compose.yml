@@ -3,6 +3,7 @@ version: "3.9"
 services:
   api:
     container_name: api
+    profiles: ["api"]
     restart: always
     environment:
       PORT: ${PORT}
@@ -53,6 +54,16 @@ services:
     networks:
       - api
     entrypoint: redis-server --appendonly yes --requirepass ${CACHE_PASSWORD}
+
+  jaeger:
+    container_name: jaeger
+    image: "jaegertracing/all-in-one:latest"
+    restart: always
+    ports:
+      - "16686:16686"
+      - "14268:14268"
+    networks:
+      - api
 
 # TODO adminer
 

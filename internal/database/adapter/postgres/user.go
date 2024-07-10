@@ -16,13 +16,11 @@ import (
 )
 
 // TODO
-//  Once we have repository interface in service, we don't need to abstract from upper/io? So much,
-//  we can use its full types in here worry free and the database package will be a lot easier to use
+//	Strings.ToLower emails wherever set and read
 
 const (
 	userTable = "user"
-
-	srid = 4326
+	srid      = 4326
 )
 
 // UserAdapter adapts a *database.Database to the service.UserRepository interface.

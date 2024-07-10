@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"go.opentelemetry.io/otel"
 	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/upper/db/v4"
 	"github.com/upper/db/v4/adapter/postgresql"
+	"go.nhat.io/otelsql"
 )
 
 const (
@@ -27,8 +29,8 @@ var (
 	errNoConnection = errors.New(`no database connection`)
 )
 
-// Config the set of configurations required for a database connection.
-type Config struct {
+// Credentials for connecting and authenticating the database connection.
+type Credentials struct {
 	// Username the username of the user to authenticate with.
 	Username string
 	// Password the password of the user to authenticate with.
@@ -37,8 +39,6 @@ type Config struct {
 	Name string
 	// Host the URL / host of the database.
 	Host string
-	// DebugEnabled whether debug settings should be configured.
-	DebugEnabled bool
 }
 
 // Database creates sessions for the client to interact with.
@@ -85,27 +85,61 @@ func (d Database) Close() error {
 }
 
 // New instantiates a new Database and opens a connection via the defaultClientFunc.
-func New(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (db.Session, error)) (*Database, error) {
-	client, err := openConnection(ctx, cfg, fn...)
+func New(ctx context.Context, c *Credentials, opts ...Option) (*Database, error) {
+	if c == nil {
+		return nil, errors.New("credentials must be provided")
+	}
+
+	cfg := &Config{
+		clientFunc:  defaultClientFunc,
+		credentials: c,
+
+		MaxIdleConns:    maxIdleConnections,
+		MaxOpenConns:    maxOpenConnections,
+		ConnMaxLifetime: maxConnLifetime,
+		DebugEnabled:    false,
+		// returns the global tracer provider or a noop if none is set.
+		TracerProvider: otel.GetTracerProvider(),
+	}
+
+	for _, opt := range opts {
+		opt.apply(cfg)
+	}
+
+	client, err := cfg.clientFunc(ctx, cfg)
 
 	return &Database{client: client}, err
 }
 
-// openConnection opens a new connection to the database using the supplied
-// username u and password p.
-func openConnection(ctx context.Context, cfg *Config, fn ...func(context.Context, *Config) (db.Session, error)) (db.Session, error) {
-	var dft = defaultClientFunc
-	if len(fn) > 0 {
-		dft = fn[0]
+var defaultClientFunc = func(ctx context.Context, cfg *Config) (db.Session, error) {
+	queryOpt := otelsql.TraceQueryWithoutArgs()
+	if cfg.DebugEnabled {
+		queryOpt = otelsql.TraceQueryWithArgs()
 	}
 
-	return dft(ctx, cfg)
-}
-
-var defaultClientFunc = func(ctx context.Context, cfg *Config) (db.Session, error) {
-	db, err := sql.Open(
+	driverName, err := otelsql.Register(
 		databaseDriver,
-		fmt.Sprintf("%s://%s:%s@%s/%s?sslmode=disable", databaseDriver, cfg.Username, cfg.Password, cfg.Host, cfg.Name),
+		otelsql.WithTracerProvider(cfg.TracerProvider),
+		otelsql.WithDatabaseName(cfg.credentials.Name),
+		otelsql.TracePing(),
+		otelsql.TraceRowsClose(),
+		otelsql.TraceRowsNext(),
+		queryOpt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open(
+		driverName,
+		fmt.Sprintf(
+			"%s://%s:%s@%s/%s?sslmode=disable",
+			databaseDriver,
+			cfg.credentials.Username,
+			cfg.credentials.Password,
+			cfg.credentials.Host,
+			cfg.credentials.Name,
+		),
 	)
 	if err != nil {
 		return nil, err
@@ -118,9 +152,9 @@ var defaultClientFunc = func(ctx context.Context, cfg *Config) (db.Session, erro
 	}
 
 	conn = conn.WithContext(ctx)
-	conn.SetMaxIdleConns(maxIdleConnections)
-	conn.SetMaxOpenConns(maxOpenConnections)
-	conn.SetConnMaxLifetime(maxConnLifetime)
+	conn.SetMaxIdleConns(cfg.MaxIdleConns)
+	conn.SetMaxOpenConns(cfg.MaxOpenConns)
+	conn.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 
 	return conn, nil
 }

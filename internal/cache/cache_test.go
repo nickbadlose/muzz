@@ -14,7 +14,7 @@ import (
 // returns a function which cleans up.
 func setupCache(t *testing.T) (*Cache, *miniredis.Miniredis, func()) {
 	srv := miniredis.RunT(t)
-	cache, err := New(context.TODO(), "", srv.Addr())
+	cache, err := New(context.TODO(), &Credentials{Host: srv.Addr()})
 	assert.NoError(t, err)
 
 	return cache, srv, func() {
