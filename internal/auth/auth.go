@@ -75,7 +75,7 @@ func (a *Authorizer) Authorize(token string) (int, *apperror.Error) {
 	})
 	if err != nil {
 		if errors.Is(err, jwt.ErrSignatureInvalid) {
-			return 0, apperror.Unauthorised(err)
+			return 0, apperror.Unauthorized(err)
 		}
 
 		return 0, apperror.Internal(err)
@@ -83,16 +83,16 @@ func (a *Authorizer) Authorize(token string) (int, *apperror.Error) {
 
 	_, ok := tkn.Claims.(*Claims)
 	if !ok {
-		return 0, apperror.Unauthorised(errors.New("unknown claims type"))
+		return 0, apperror.Unauthorized(errors.New("unknown claims type"))
 	}
 
 	if !tkn.Valid {
-		return 0, apperror.Unauthorised(errors.New("invalid jwt"))
+		return 0, apperror.Unauthorized(errors.New("invalid jwt"))
 	}
 
 	err = a.validateClaims(c)
 	if err != nil {
-		return 0, apperror.Unauthorised(err)
+		return 0, apperror.Unauthorized(err)
 	}
 
 	return c.UserID, nil

@@ -57,7 +57,7 @@ func TestAuthorizer_Authenticate(t *testing.T) {
 
 		require.Error(t, err)
 		require.Equal(t, "incorrect credentials", err.Error())
-		require.Equal(t, apperror.StatusUnauthorised, err.Status())
+		require.Equal(t, apperror.StatusUnauthorized, err.Status())
 		require.Empty(t, token)
 	})
 }
@@ -140,7 +140,7 @@ func TestAuthorizer_Authorize(t *testing.T) {
 			userID, aErr := au.Authorize(token)
 			require.Error(t, aErr)
 			require.Equal(t, tc.errMessage, aErr.Error())
-			require.Equal(t, apperror.StatusUnauthorised, aErr.Status())
+			require.Equal(t, apperror.StatusUnauthorized, aErr.Status())
 			require.Empty(t, userID)
 		})
 	}
@@ -167,7 +167,7 @@ func TestAuthorizer_Authorize(t *testing.T) {
 		userID, aErr := au.Authorize(token)
 		require.Error(t, aErr)
 		require.Equal(t, "token is expired", aErr.Error())
-		require.Equal(t, apperror.StatusUnauthorised, aErr.Status())
+		require.Equal(t, apperror.StatusUnauthorized, aErr.Status())
 		require.Empty(t, userID)
 
 		viper.Set("JWT_DURATION", "12h")

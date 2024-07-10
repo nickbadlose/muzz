@@ -93,7 +93,7 @@ func TestAuthService_Login(t *testing.T) {
 					Once().Return(nil, apperror.NoResults)
 			},
 			errMessage: "incorrect credentials",
-			errStatus:  apperror.StatusUnauthorised,
+			errStatus:  apperror.StatusUnauthorized,
 		},
 		{
 			name:  "authentication failed",
@@ -110,7 +110,7 @@ func TestAuthService_Login(t *testing.T) {
 				}, nil)
 			},
 			errMessage: "incorrect credentials",
-			errStatus:  apperror.StatusUnauthorised,
+			errStatus:  apperror.StatusUnauthorized,
 		},
 		{
 			name:  "error from repository - update user location",

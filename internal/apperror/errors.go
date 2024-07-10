@@ -18,8 +18,8 @@ const (
 	StatusNotFound
 	// StatusInternal states an internal server issue.
 	StatusInternal
-	// StatusUnauthorised states a request was unauthorised.
-	StatusUnauthorised
+	// StatusUnauthorized states a request was unauthorised.
+	StatusUnauthorized
 )
 
 type Error struct {
@@ -35,7 +35,7 @@ func (e *Error) ToHTTP() *HTTPResponse {
 		status = http.StatusBadRequest
 	case StatusNotFound:
 		status = http.StatusNotFound
-	case StatusUnauthorised:
+	case StatusUnauthorized:
 		status = http.StatusUnauthorized
 	default:
 		status = http.StatusInternalServerError
@@ -76,16 +76,16 @@ func Internal(err error) *Error {
 	}
 }
 
-func Unauthorised(err error) *Error {
+func Unauthorized(err error) *Error {
 	return &Error{
-		status: StatusUnauthorised,
+		status: StatusUnauthorized,
 		error:  err,
 	}
 }
 
 func IncorrectCredentials() *Error {
 	return &Error{
-		status: StatusUnauthorised,
+		status: StatusUnauthorized,
 		error:  errors.New("incorrect credentials"),
 	}
 }
