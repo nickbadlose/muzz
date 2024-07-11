@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/render"
@@ -30,12 +29,9 @@ func (*LoginResponse) Render(w http.ResponseWriter, r *http.Request) error {
 
 // Login logs the user into the application.
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
-	req := new(LoginRequest)
-	err := json.NewDecoder(r.Body).Decode(req)
+	req, err := decodeRequest[*LoginRequest](w, r)
 	if err != nil {
 		logger.Error(r.Context(), "decoding login request", err)
-		err = render.Render(w, r, apperror.BadRequestHTTP(err))
-		logger.MaybeError(r.Context(), renderingErrorMessage, err)
 		return
 	}
 
@@ -60,7 +56,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = render.Render(w, r, &LoginResponse{Token: token})
+	err = encodeResponse(w, r, h.config.DebugEnabled(), &LoginResponse{Token: token})
 	if err != nil {
 		logger.Error(r.Context(), "rendering login response", err)
 	}

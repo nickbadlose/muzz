@@ -1,19 +1,20 @@
 package router
 
 import (
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-	"go.opentelemetry.io/otel/trace"
+	"github.com/nickbadlose/muzz/internal/tracer"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz/api/handlers"
+	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/auth"
-	httpMiddleware "github.com/nickbadlose/muzz/internal/middleware/http"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 )
 
-func New(h *handlers.Handlers, v *auth.Authorizer, tp trace.TracerProvider) http.Handler {
+func New(h *handlers.Handlers, cfg *config.Config, au *auth.Authorizer, tp trace.TracerProvider) http.Handler {
 	r := chi.NewRouter()
 
 	// TODO
@@ -23,15 +24,17 @@ func New(h *handlers.Handlers, v *auth.Authorizer, tp trace.TracerProvider) http
 	//  - use timestamps for migrations
 
 	r.Use(
-		httpMiddleware.NewTraceMiddleware(tp),
 		middleware.AllowContentType("application/json"),
 		middleware.RealIP,
 		middleware.Logger, // TODO custom logger?
 		middleware.Recoverer,
-	)
-	r.Use(
 		render.SetContentType(render.ContentTypeJSON),
+		tracer.HTTPResponseHeaders,
 	)
+
+	if cfg.DebugEnabled() {
+		r.Use(tracer.HTTPDebugMiddleware(tp))
+	}
 
 	// Public routes
 	r.Group(func(r chi.Router) {
@@ -45,7 +48,7 @@ func New(h *handlers.Handlers, v *auth.Authorizer, tp trace.TracerProvider) http
 
 	// Private routes
 	r.Group(func(r chi.Router) {
-		r.Use(httpMiddleware.NewAuthMiddleware(v))
+		r.Use(auth.NewHTTPMiddleware(au))
 		r.Get("/discover", h.Discover)
 		r.Post("/swipe", h.Swipe)
 	})

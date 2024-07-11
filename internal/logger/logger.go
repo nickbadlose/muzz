@@ -2,15 +2,19 @@ package logger
 
 import (
 	"context"
+	"go.opentelemetry.io/otel/trace"
 	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
+// TODO check caller
 const (
 	// the amount of function call frames to skip when determining the caller function.
-	callerSkip = 3
+	callerSkip = 4
+	// traceIDKey for logging the trace ID..
+	traceIDKey = "trace_id"
 )
 
 var (
@@ -27,6 +31,9 @@ var (
 type (
 	// Field a type alias to the internal field type.
 	Field = zap.Field
+	// logFunc matches the signature for most of the logging functions
+	// available on the internal logger.
+	logFunc func(msg string, fields ...Field)
 )
 
 // New initialises a new production logger.
@@ -58,6 +65,17 @@ func New(opts ...Option) error {
 	return nil
 }
 
+func addTraceId(ctx context.Context) zap.Field {
+	span := trace.SpanFromContext(ctx)
+	traceID := span.SpanContext().TraceID().String()
+	return zap.String(traceIDKey, traceID)
+}
+
+// decorateLogs with trace information.
+func decorateLogs(ctx context.Context, fn logFunc, msg string, fields ...Field) {
+	fn(msg, append(fields, addTraceId(ctx))...)
+}
+
 // wrapNoLogger helper func which wraps if the logger is not initialised.
 func wrapNoLogger(fn func()) {
 	lock.RLock()
@@ -87,27 +105,27 @@ func Close() error {
 
 // Info logs with the info log level.
 func Info(ctx context.Context, msg string, fields ...Field) {
-	wrapNoLogger(func() { logger.Info(msg, fields...) })
+	wrapNoLogger(func() { decorateLogs(ctx, logger.Info, msg, fields...) })
 }
 
 // Warn logs with the warn log level.
 func Warn(ctx context.Context, msg string, fields ...Field) {
-	wrapNoLogger(func() { logger.Warn(msg, fields...) })
+	wrapNoLogger(func() { decorateLogs(ctx, logger.Warn, msg, fields...) })
 }
 
 // Error logs with the error log level.
 func Error(ctx context.Context, msg string, err error, fields ...Field) {
-	wrapNoLogger(func() { logger.Error(msg, append([]Field{zap.Error(err)}, fields...)...) })
+	wrapNoLogger(func() { decorateLogs(ctx, logger.Error, msg, append([]Field{zap.Error(err)}, fields...)...) })
 }
 
 // Debug logs with the debug log level.
 func Debug(ctx context.Context, msg string, fields ...Field) {
-	wrapNoLogger(func() { logger.Debug(msg, fields...) })
+	wrapNoLogger(func() { decorateLogs(ctx, logger.Debug, msg, fields...) })
 }
 
 // Fatal logs with the Fatal log level. calling this will also cause an os.Exit(1)
 func Fatal(ctx context.Context, msg string, fields ...Field) {
-	wrapNoLogger(func() { logger.Fatal(msg, fields...) })
+	wrapNoLogger(func() { decorateLogs(ctx, logger.Fatal, msg, fields...) })
 }
 
 // MaybeError logs with the error log level if one exists.
@@ -115,7 +133,7 @@ func MaybeError(ctx context.Context, msg string, err error, fields ...Field) {
 	if err == nil {
 		return
 	}
-	wrapNoLogger(func() { logger.Error(msg, append([]Field{zap.Error(err)}, fields...)...) })
+	wrapNoLogger(func() { decorateLogs(ctx, logger.Error, msg, append([]Field{zap.Error(err)}, fields...)...) })
 }
 
 // availableLogLevels the available zap log levels.

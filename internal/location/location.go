@@ -30,9 +30,12 @@ type Config interface {
 type Location struct {
 	config Config
 	cache  *cache.Cache
+	client *http.Client
 }
 
-func New(cfg Config, ca *cache.Cache) *Location { return &Location{config: cfg, cache: ca} }
+func New(cfg Config, ca *cache.Cache) *Location {
+	return &Location{config: cfg, cache: ca, client: http.DefaultClient}
+}
 
 type geoIPResponse struct {
 	Lat float64 `json:"latitude"`
@@ -46,6 +49,8 @@ type errResponse struct {
 	Type string `json:"type"`
 	Info string `json:"info"`
 }
+
+// TODO trace request
 
 // ByIP performs a geoip query to retrieve a lat and long from a source ip address.
 func (l *Location) ByIP(ctx context.Context, sourceIp string) (orb.Point, error) {
@@ -87,7 +92,7 @@ func (l *Location) ByIP(ctx context.Context, sourceIp string) (orb.Point, error)
 	req.Header.Add("accept", "application/json")
 	req.Header.Add("content-type", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := l.client.Do(req)
 	if err != nil {
 		logger.Error(ctx, "performing geoip request", err)
 		return orb.Point{}, err

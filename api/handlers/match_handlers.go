@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/render"
@@ -42,12 +41,9 @@ func (h *Handlers) Swipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := new(SwipeRequest)
-	err = json.NewDecoder(r.Body).Decode(req)
+	req, err := decodeRequest[SwipeRequest](w, r)
 	if err != nil {
 		logger.Error(r.Context(), "decoding swipe request", err)
-		err = render.Render(w, r, apperror.BadRequestHTTP(err))
-		logger.MaybeError(r.Context(), renderingErrorMessage, err)
 		return
 	}
 
@@ -65,7 +61,12 @@ func (h *Handlers) Swipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = render.Render(w, r, &SwipeResponse{Result: &Match{Matched: res.Matched, MatchID: res.ID}})
+	err = encodeResponse(
+		w,
+		r,
+		h.config.DebugEnabled(),
+		&SwipeResponse{Result: &Match{Matched: res.Matched, MatchID: res.ID}},
+	)
 	if err != nil {
 		logger.Error(r.Context(), "rendering swipe response", err)
 	}

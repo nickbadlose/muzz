@@ -27,6 +27,10 @@ const (
 	idleTimeout = 30 * time.Second
 )
 
+// TODO
+//  NewServer func which constructs server and abstracts it from here
+//  integration tests will need current setup due to location mocking
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -84,11 +88,11 @@ func main() {
 	matchService := service.NewMatchService(matchAdapter)
 	userService := service.NewUserService(userAdapter)
 
-	hlr := handlers.New(authorizer, loc, authService, userService, matchService)
+	hlr := handlers.New(cfg, authorizer, loc, authService, userService, matchService)
 
 	// TODO server configuration
 	server := &http.Server{
-		Handler: router.New(hlr, authorizer, tp),
+		Handler: router.New(hlr, cfg, authorizer, tp),
 		Addr:    cfg.Port(),
 	}
 

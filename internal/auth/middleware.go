@@ -1,7 +1,6 @@
-package http
+package auth
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -16,13 +15,8 @@ const (
 	renderingErrorMessage = "rendering error response"
 )
 
-type Authorizer interface {
-	Authorize(jwt string) (userID int, err *apperror.Error)
-	UserOnContext(ctx context.Context, userID int) context.Context
-}
-
-// NewAuthMiddleware returns a middleware that authenticates the request JWT and sets the user ID on context.
-func NewAuthMiddleware(authorizer Authorizer) func(next http.Handler) http.Handler {
+// NewHTTPMiddleware returns a middleware that authenticates the request JWT and sets the user ID on context.
+func NewHTTPMiddleware(authorizer *Authorizer) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			bearerToken := r.Header.Get(authorizationHeader)

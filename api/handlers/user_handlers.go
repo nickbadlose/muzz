@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
@@ -52,12 +51,9 @@ func (*UserResponse) Render(w http.ResponseWriter, r *http.Request) error {
 
 // CreateUser creates a user in the application.
 func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
-	req := new(CreateUserRequest)
-	err := json.NewDecoder(r.Body).Decode(req)
+	req, err := decodeRequest[CreateUserRequest](w, r)
 	if err != nil {
 		logger.Error(r.Context(), "decoding create user request", err)
-		err = render.Render(w, r, apperror.BadRequestHTTP(err))
-		logger.MaybeError(r.Context(), renderingErrorMessage, err)
 		return
 	}
 
@@ -78,7 +74,7 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = render.Render(w, r, &UserResponse{
+	err = encodeResponse(w, r, h.config.DebugEnabled(), &UserResponse{
 		Result: &User{
 			ID:       user.ID,
 			Email:    user.Email,
@@ -178,7 +174,7 @@ func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	err = render.Render(w, r, &DiscoverResponse{Results: users})
+	err = encodeResponse(w, r, h.config.DebugEnabled(), &DiscoverResponse{Results: users})
 	if err != nil {
 		logger.Error(r.Context(), "rendering discover response", err)
 	}
