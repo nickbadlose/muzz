@@ -17,8 +17,6 @@ const (
 	httpSpanName  = "HTTP"
 )
 
-// TODO add parameters to trace r.URL.rawQuery ?
-
 // HTTPDebugMiddleware returns a middleware that traces all request and response information for the server.
 //
 // This should not be used in production.
@@ -46,6 +44,7 @@ func HTTPDebugMiddleware(tp trace.TracerProvider) func(next http.Handler) http.H
 			r = r.Clone(ctx)
 			span.SetAttributes(semconv.HTTPClientAttributesFromHTTPRequest(r)...)
 			span.SetAttributes(semconv.NetAttributesFromHTTPRequest("tcp", r)...)
+			span.SetAttributes(Attribute("http.query_params", r.URL.RawQuery))
 
 			reqDump, err := httputil.DumpRequest(r, true)
 			if err != nil {
