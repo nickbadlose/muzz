@@ -34,6 +34,7 @@ import (
 //  - have migrations_test.go file in here which test constraints etc.
 //  - try t.parallel to speed these up, I think it might fail if all accessing same db, is there a way to fix that?
 //  - try test main func
+//  - search fmt.Println and log. and TODO
 
 // mockLocation to mock getting the location from IP address. This is the only part of our integration tests we mock,
 // so we don't spam the geoip service.
@@ -48,8 +49,6 @@ func (*mockLocation) ByIP(_ context.Context, _ string) (orb.Point, error) {
 func newTestServer(t *testing.T) *httptest.Server {
 	cfg, err := config.Load()
 	require.NoError(t, err)
-
-	fmt.Println(cfg.DatabaseUser(), cfg.DatabasePassword())
 
 	db := setupDB(t, cfg)
 	matchAdapter := postgres.NewMatchAdapter(db)

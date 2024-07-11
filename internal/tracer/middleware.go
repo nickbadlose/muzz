@@ -2,13 +2,14 @@ package tracer
 
 import (
 	"fmt"
+	"net/http"
+
 	"github.com/nickbadlose/muzz/internal/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
-	"net/http"
 	"net/http/httputil"
 )
 

@@ -17,7 +17,7 @@ import (
 )
 
 // TODO
-//	Strings.ToLower emails wherever set and read
+//  Strings.ToLower emails wherever set and read
 
 const (
 	userTable = "user"
