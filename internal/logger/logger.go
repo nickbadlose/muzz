@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// TODO check caller
 const (
 	// the amount of function call frames to skip when determining the caller function.
 	callerSkip = 4
@@ -31,8 +30,7 @@ var (
 type (
 	// Field a type alias to the internal field type.
 	Field = zap.Field
-	// logFunc matches the signature for most of the logging functions
-	// available on the internal logger.
+	// logFunc matches the signature for the logging functions available on the internal logger.
 	logFunc func(msg string, fields ...Field)
 )
 

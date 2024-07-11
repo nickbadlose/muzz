@@ -6,6 +6,7 @@ import (
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/logger"
+	"github.com/paulmach/orb"
 	"go.uber.org/zap"
 )
 
@@ -20,6 +21,7 @@ import (
 type UserRepository interface {
 	CreateUser(context.Context, *muzz.CreateUserInput) (*muzz.User, error)
 	GetUsers(context.Context, *muzz.GetUsersInput) ([]*muzz.UserDetails, error)
+	UpdateUserLocation(ctx context.Context, id int, location orb.Point) error
 }
 
 type UserService struct {

@@ -54,8 +54,9 @@ func TestUserAdapter_CreateUser(t *testing.T) {
 			AddRow(1, "test@test.com", "Pa55w0rd!", "test", "male", 25, []byte("0101000020E61000002EFF21FDF63514C0355EBA490C224940"))
 
 		mock.ExpectQuery(`INSERT INTO "user" \("email", "password", "name", "gender", "age", "location"\) 
-VALUES \(\$1, \$2, \$3, \$4, \$5, ST_SetSRID\(ST_MakePoint\(\$6,\$7\),\$8\)\) 
+VALUES \(\$1, crypt\(\$2, gen_salt\('bf'\)\), \$3, \$4, \$5, ST_SetSRID\(ST_MakePoint\(\$6,\$7\),\$8\)\) 
 RETURNING "id", "email", "password", "name", "gender", "age", "location"`).
+			WithArgs("test@test.com", "Pa55w0rd!", "test", "male", 25, -5.0527, 50.266, 4326).
 			WillReturnRows(rows)
 
 		got, err := sut.CreateUser(
@@ -87,8 +88,9 @@ RETURNING "id", "email", "password", "name", "gender", "age", "location"`).
 		sut, mock := newTestUserAdapter(t)
 
 		mock.ExpectQuery(`INSERT INTO "user" \("email", "password", "name", "gender", "age", "location"\) 
-VALUES \(\$1, \$2, \$3, \$4, \$5, ST_SetSRID\(ST_MakePoint\(\$6,\$7\),\$8\)\) 
+VALUES \(\$1, crypt\(\$2, gen_salt\('bf'\)\), \$3, \$4, \$5, ST_SetSRID\(ST_MakePoint\(\$6,\$7\),\$8\)\) 
 RETURNING "id", "email", "password", "name", "gender", "age", "location"`).
+			WithArgs("test@test.com", "Pa55w0rd!", "test", "male", 25, -5.0527, 50.266, 4326).
 			WillReturnError(errors.New("database error"))
 
 		got, err := sut.CreateUser(
@@ -110,17 +112,19 @@ RETURNING "id", "email", "password", "name", "gender", "age", "location"`).
 	})
 }
 
-func TestUserAdapter_UserByEmail(t *testing.T) {
+func TestUserAdapter_Authenticate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		sut, mock := newTestUserAdapter(t)
 
 		rows := mock.NewRows([]string{"id", "email", "password", "name", "gender", "age"}).
 			AddRow(1, "test@test.com", "Pa55w0rd!", "test", "male", 25)
 
-		mock.ExpectQuery(`SELECT "id", "email", "password", "name", "gender", "age" FROM "user" WHERE \(email = \$1\)`).
+		mock.ExpectQuery(`SELECT "id", "email", "password", "name", "gender", "age" FROM "user" 
+                                WHERE \(email = \$1 AND password = crypt\(\$2, password\)`).
+			WithArgs("test@test.com", "Pa55w0rd!").
 			WillReturnRows(rows)
 
-		got, err := sut.UserByEmail(context.Background(), "test@test.com")
+		got, err := sut.Authenticate(context.Background(), "test@test.com", "Pa55w0rd!")
 
 		require.NoError(t, err)
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -140,10 +144,12 @@ func TestUserAdapter_UserByEmail(t *testing.T) {
 		rows := mock.NewRows([]string{"id", "email", "password", "name", "gender", "age"}).
 			AddRow(1, "test@test.com", "Pa55w0rd!", "test", "unsupported", 25)
 
-		mock.ExpectQuery(`SELECT "id", "email", "password", "name", "gender", "age" FROM "user" WHERE \(email = \$1\)`).
+		mock.ExpectQuery(`SELECT "id", "email", "password", "name", "gender", "age" FROM "user" 
+                                WHERE \(email = \$1 AND password = crypt\(\$2, password\)`).
+			WithArgs("test@test.com", "Pa55w0rd!").
 			WillReturnRows(rows)
 
-		got, err := sut.UserByEmail(context.Background(), "test@test.com")
+		got, err := sut.Authenticate(context.Background(), "test@test.com", "Pa55w0rd!")
 
 		require.NoError(t, err)
 		require.NoError(t, mock.ExpectationsWereMet())
@@ -178,12 +184,15 @@ func TestUserAdapter_UserByEmail(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sut, mock := newTestUserAdapter(t)
 
-			mock.ExpectQuery(`SELECT "id", "email", "password", "name", "gender", "age" FROM "user" WHERE \(email = \$1\)`).
+			mock.ExpectQuery(`SELECT "id", "email", "password", "name", "gender", "age" FROM "user" 
+                                WHERE \(email = \$1 AND password = crypt\(\$2, password\)`).
+				WithArgs("test@test.com", "Pa55w0rd!").
 				WillReturnError(tc.err)
 
-			got, err := sut.UserByEmail(
+			got, err := sut.Authenticate(
 				context.Background(),
 				"test@test.com",
+				"Pa55w0rd!",
 			)
 
 			require.Error(t, err)

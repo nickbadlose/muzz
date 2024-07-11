@@ -2,16 +2,17 @@ package tracer
 
 import (
 	"fmt"
-	"go.opentelemetry.io/otel/attribute"
 	"log"
 	"reflect"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
 	libVersion = "1.0"
-	libName    = "github.com/nickbadlose/muzz/internal/middleware/http"
+	libName    = "github.com/nickbadlose/muzz/internal/tracer"
 
 	// separator for a http dump between the body and metadata.
 	separator = "\r\n\r\n"
@@ -60,7 +61,7 @@ func Attribute(key string, value any) (kv attribute.KeyValue) {
 	return
 }
 
-// attributesFromDump splits the metadata and the request body into two separate strings and returns them as
+// attributesFromRequestDump splits the metadata and the request body into two separate strings and returns them as
 // attributes.
 //
 // If the `Transfer-Encoding: chunked` header is set and the content length is unknown, then the body will be wrapped

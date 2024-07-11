@@ -2,12 +2,10 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/logger"
-	"github.com/paulmach/orb"
 	"go.uber.org/zap"
 )
 
@@ -18,21 +16,16 @@ import (
 //  Do some sort of docs, if README or swagger or something else
 
 type Authenticator interface {
-	Authenticate(user *muzz.User, password string) (string, *apperror.Error)
-}
-
-type AuthRepository interface {
-	UserByEmail(ctx context.Context, email string) (*muzz.User, error)
-	UpdateUserLocation(ctx context.Context, id int, location orb.Point) error
+	Authenticate(ctx context.Context, email, password string) (token string, user *muzz.User, err *apperror.Error)
 }
 
 type AuthService struct {
-	repository    AuthRepository
+	repository    UserRepository
 	authenticator Authenticator
 }
 
-func NewAuthService(ar AuthRepository, auth Authenticator) *AuthService {
-	return &AuthService{ar, auth}
+func NewAuthService(auth Authenticator, ur UserRepository) *AuthService {
+	return &AuthService{ur, auth}
 }
 
 func (as *AuthService) Login(ctx context.Context, in *muzz.LoginInput) (string, *apperror.Error) {
@@ -44,16 +37,7 @@ func (as *AuthService) Login(ctx context.Context, in *muzz.LoginInput) (string, 
 		return "", apperror.BadInput(err)
 	}
 
-	user, err := as.repository.UserByEmail(ctx, in.Email)
-	if errors.Is(err, apperror.NoResults) {
-		return "", apperror.IncorrectCredentials()
-	}
-	if err != nil {
-		logger.Error(ctx, "getting user from database", err)
-		return "", apperror.Internal(err)
-	}
-
-	token, aErr := as.authenticator.Authenticate(user, in.Password)
+	token, user, aErr := as.authenticator.Authenticate(ctx, in.Email, in.Password)
 	if aErr != nil {
 		logger.Error(ctx, "authenticating user", aErr)
 		return "", aErr

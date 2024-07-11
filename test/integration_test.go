@@ -55,9 +55,9 @@ func newTestServer(t *testing.T) *httptest.Server {
 	matchAdapter := postgres.NewMatchAdapter(db)
 	userAdapter := postgres.NewUserAdapter(db)
 
-	authorizer := auth.NewAuthorizer(cfg)
+	authorizer := auth.NewAuthorizer(cfg, userAdapter)
 
-	authService := service.NewAuthService(userAdapter, authorizer)
+	authService := service.NewAuthService(authorizer, userAdapter)
 	matchService := service.NewMatchService(matchAdapter)
 	userService := service.NewUserService(userAdapter)
 
@@ -169,17 +169,16 @@ func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	return db
 }
 
-func TestPublic(t *testing.T) {
-	cases := []struct {
-		endpoint, method string
-		body             interface{}
-		expectedCode     int
-	}{
-		{endpoint: "status", method: http.MethodGet, expectedCode: http.StatusOK},
-		{
-			endpoint: "user/create",
-			method:   http.MethodPost,
-			body: &handlers.CreateUserRequest{
+// password gets encrypted, so we can't consistently assert the full response
+func TestUserCreate_Success(t *testing.T) {
+	t.Run("POST/user/create", func(t *testing.T) {
+		srv := newTestServer(t)
+
+		resp := makeRequest(
+			t,
+			http.MethodPost,
+			fmt.Sprintf("%s/%s", srv.URL, "user/create"),
+			&handlers.CreateUserRequest{
 				Email:    "test8@test.com",
 				Password: "Pa55w0rd!",
 				Name:     "test",
@@ -187,8 +186,43 @@ func TestPublic(t *testing.T) {
 				Age:      25,
 				Location: handlers.Location{Lat: 50.266, Lon: -5.0527},
 			},
-			expectedCode: http.StatusCreated,
-		},
+		)
+
+		got := &handlers.UserResponse{}
+		err := json.NewDecoder(resp.Body).Decode(got)
+		require.NoError(t, err)
+		require.NoError(t, resp.Body.Close())
+
+		require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+		// since password in encrypted, we cannot assert it.
+		require.NotEmpty(t, got.Result.Password)
+		got.Result.Password = ""
+		require.Equal(
+			t,
+			&handlers.UserResponse{
+				Result: &handlers.User{
+					ID:       8,
+					Email:    "test8@test.com",
+					Password: "",
+					Name:     "test",
+					Gender:   "female",
+					Age:      25,
+					Location: handlers.Location{Lat: 50.266, Lon: -5.0527},
+				},
+			},
+			got,
+		)
+	})
+}
+
+func TestPublic(t *testing.T) {
+	cases := []struct {
+		endpoint, method string
+		body             interface{}
+		expectedCode     int
+	}{
+		{endpoint: "status", method: http.MethodGet, expectedCode: http.StatusOK},
 	}
 
 	for _, tc := range cases {

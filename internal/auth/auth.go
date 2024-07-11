@@ -10,8 +10,6 @@ import (
 	"github.com/nickbadlose/muzz/internal/apperror"
 )
 
-// TODO add encryption / decryption into here
-
 type userCtxKey string
 
 const (
@@ -25,11 +23,16 @@ type Config interface {
 	JWTSecret() string
 }
 
-type Authorizer struct {
-	config Config
+type Repository interface {
+	Authenticate(ctx context.Context, email, password string) (*muzz.User, error)
 }
 
-func NewAuthorizer(cfg Config) *Authorizer { return &Authorizer{cfg} }
+type Authorizer struct {
+	config     Config
+	repository Repository
+}
+
+func NewAuthorizer(cfg Config, repo Repository) *Authorizer { return &Authorizer{cfg, repo} }
 
 // Claims to store in the JWT.
 type Claims struct {
@@ -37,11 +40,14 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// Authenticate the given user into a JWT.
-func (a *Authorizer) Authenticate(user *muzz.User, password string) (string, *apperror.Error) {
-	// TODO compare with encryption lib
-	if user.Password != password {
-		return "", apperror.IncorrectCredentials()
+// Authenticate the given credentials.
+func (a *Authorizer) Authenticate(ctx context.Context, email, password string) (string, *muzz.User, *apperror.Error) {
+	user, err := a.repository.Authenticate(ctx, email, password)
+	if errors.Is(err, apperror.NoResults) {
+		return "", nil, apperror.IncorrectCredentials()
+	}
+	if err != nil {
+		return "", nil, apperror.Internal(err)
 	}
 
 	t := time.Now().UTC()
@@ -60,10 +66,10 @@ func (a *Authorizer) Authenticate(user *muzz.User, password string) (string, *ap
 
 	tString, err := token.SignedString([]byte(a.config.JWTSecret()))
 	if err != nil {
-		return "", apperror.Internal(err)
+		return "", nil, apperror.Internal(err)
 	}
 
-	return tString, nil
+	return tString, user, nil
 }
 
 // Authorize parses and authorizes the given request JWT, extracts the Claims and authorizes them,

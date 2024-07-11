@@ -2,7 +2,9 @@ package auth
 
 import (
 	"context"
+	mockauth "github.com/nickbadlose/muzz/internal/auth/mocks"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
 
@@ -20,22 +22,39 @@ func init() {
 	viper.Set("JWT_SECRET", "test")
 }
 
+func newTestAuthenticator(t *testing.T) (*Authorizer, *mockauth.Repository) {
+	cfg, err := config.Load()
+	require.NoError(t, err)
+	m := mockauth.NewRepository(t)
+	return NewAuthorizer(cfg, m), m
+}
+
 func newTestAuthorizer(t *testing.T) *Authorizer {
 	cfg, err := config.Load()
 	require.NoError(t, err)
-	return NewAuthorizer(cfg)
+	return NewAuthorizer(cfg, mockauth.NewRepository(t))
 }
 
 func TestAuthorizer_Authenticate(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		au := newTestAuthorizer(t)
-		token, err := au.Authenticate(
-			&muzz.User{ID: 1, Password: "Pa55w0rd!"},
+		au, m := newTestAuthenticator(t)
+
+		m.EXPECT().Authenticate(
+			mock.Anything,
+			"test@test.com",
+			"Pa55w0rd!",
+		).Return(&muzz.User{ID: 1}, nil)
+
+		token, user, err := au.Authenticate(
+			context.Background(),
+			"test@test.com",
 			"Pa55w0rd!",
 		)
 
 		require.Nil(t, err)
+		require.NotNil(t, user)
 		require.NotEmpty(t, token)
+		require.Equal(t, 1, user.ID)
 
 		claims := &Claims{}
 		tkn, pErr := jwt.ParseWithClaims(token, claims, func(_ *jwt.Token) (interface{}, error) {
@@ -49,12 +68,22 @@ func TestAuthorizer_Authenticate(t *testing.T) {
 	})
 
 	t.Run("failure: incorrect credentials", func(t *testing.T) {
-		au := newTestAuthorizer(t)
-		token, err := au.Authenticate(
-			&muzz.User{ID: 1, Password: "Pa55w0rd!"},
-			"wrongPassword!",
+		au, m := newTestAuthenticator(t)
+
+		m.EXPECT().Authenticate(
+			mock.Anything,
+			"test@test.com",
+			"Pa55w0rd!",
+		).Return(nil, apperror.NoResults)
+
+		token, user, err := au.Authenticate(
+			context.Background(),
+			"test@test.com",
+			"Pa55w0rd!",
 		)
 
+		require.Nil(t, user)
+		require.Empty(t, token)
 		require.Error(t, err)
 		require.Equal(t, "incorrect credentials", err.Error())
 		require.Equal(t, apperror.StatusUnauthorized, err.Status())
@@ -64,9 +93,17 @@ func TestAuthorizer_Authenticate(t *testing.T) {
 
 func TestAuthorizer_Authorize(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		au := newTestAuthorizer(t)
-		token, err := au.Authenticate(
-			&muzz.User{ID: 1, Password: "Pa55w0rd!"},
+		au, m := newTestAuthenticator(t)
+
+		m.EXPECT().Authenticate(
+			mock.Anything,
+			"test@test.com",
+			"Pa55w0rd!",
+		).Return(&muzz.User{ID: 1}, nil)
+
+		token, _, err := au.Authenticate(
+			context.Background(),
+			"test@test.com",
 			"Pa55w0rd!",
 		)
 		require.Nil(t, err)

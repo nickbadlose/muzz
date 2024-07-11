@@ -3,32 +3,24 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/paulmach/orb"
 	"testing"
 
 	"github.com/nickbadlose/muzz"
-	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/apperror"
-	"github.com/nickbadlose/muzz/internal/auth"
 	mockservice "github.com/nickbadlose/muzz/internal/service/mocks"
+	"github.com/paulmach/orb"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-func newTestAuthService(t *testing.T, m *mockservice.AuthRepository) *AuthService {
-	cfg, err := config.Load()
-	require.NoError(t, err)
-	a := auth.NewAuthorizer(cfg)
-	return NewAuthService(m, a)
-}
-
 func TestAuthService_Login(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		m := mockservice.NewAuthRepository(t)
-		sut := newTestAuthService(t, m)
+		mu := mockservice.NewUserRepository(t)
+		ma := mockservice.NewAuthenticator(t)
+		sut := NewAuthService(ma, mu)
 
-		m.EXPECT().
-			UserByEmail(mock.Anything, "test@test.com").Once().Return(
+		ma.EXPECT().
+			Authenticate(mock.Anything, "test@test.com", "Pa55w0rd!").Once().Return(
 			&muzz.User{
 				ID:       1,
 				Email:    "test@test.com",
@@ -37,9 +29,9 @@ func TestAuthService_Login(t *testing.T) {
 				Gender:   muzz.GenderMale,
 				Age:      25,
 			}, nil,
-		)
+		).Once().Return("token", &muzz.User{ID: 1}, nil)
 
-		m.EXPECT().UpdateUserLocation(mock.Anything, 1, orb.Point{1, 1}).
+		mu.EXPECT().UpdateUserLocation(mock.Anything, 1, orb.Point{1, 1}).
 			Once().Return(nil)
 
 		got, err := sut.Login(
@@ -53,60 +45,40 @@ func TestAuthService_Login(t *testing.T) {
 	errCases := []struct {
 		name          string
 		input         *muzz.LoginInput
-		setupMockRepo func(*mockservice.AuthRepository)
+		setupMockRepo func(*mockservice.Authenticator, *mockservice.UserRepository)
 		errMessage    string
 		errStatus     apperror.Status
 	}{
 		{
 			name:          "invalid input",
 			input:         &muzz.LoginInput{},
-			setupMockRepo: func(m *mockservice.AuthRepository) {},
+			setupMockRepo: func(ma *mockservice.Authenticator, mu *mockservice.UserRepository) {},
 			errMessage:    "email is a required field",
 			errStatus:     apperror.StatusBadInput,
 		},
 		{
-			name:  "error from repository - user by email",
+			name:  "error from authenticator",
 			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!", Location: orb.Point{0, 0}},
-			setupMockRepo: func(m *mockservice.AuthRepository) {
-				m.EXPECT().UserByEmail(mock.Anything, "test@test.com").
-					Once().Return(nil, errors.New("database error"))
+			setupMockRepo: func(ma *mockservice.Authenticator, mu *mockservice.UserRepository) {
+				ma.EXPECT().
+					Authenticate(mock.Anything, "test@test.com", "Pa55w0rd!").
+					Once().
+					Return(
+						"",
+						nil,
+						apperror.NewErr(apperror.StatusInternal, errors.New("authenticator error")),
+					)
 			},
-			errMessage: "database error",
+			errMessage: "authenticator error",
 			errStatus:  apperror.StatusInternal,
 		},
 		{
-			name:  "incorrect email",
-			input: &muzz.LoginInput{Email: "wrong@email.com", Password: "Pa55w0rd!"},
-			setupMockRepo: func(m *mockservice.AuthRepository) {
-				m.EXPECT().UserByEmail(mock.Anything, "wrong@email.com").
-					Once().Return(nil, apperror.NoResults)
-			},
-			errMessage: "incorrect credentials",
-			errStatus:  apperror.StatusUnauthorized,
-		},
-		{
-			name:  "authentication failed",
-			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!"},
-			setupMockRepo: func(m *mockservice.AuthRepository) {
-				m.EXPECT().UserByEmail(mock.Anything, "test@test.com").
-					Once().Return(&muzz.User{
-					ID:       0,
-					Email:    "test@test.com",
-					Password: "SomeOtherPa55w0rd!",
-					Name:     "",
-					Gender:   muzz.GenderUndefined,
-					Age:      0,
-				}, nil)
-			},
-			errMessage: "incorrect credentials",
-			errStatus:  apperror.StatusUnauthorized,
-		},
-		{
-			name:  "error from repository - update user location",
+			name:  "error from user repository - update user location",
 			input: &muzz.LoginInput{Email: "test@test.com", Password: "Pa55w0rd!", Location: orb.Point{1, 1}},
-			setupMockRepo: func(m *mockservice.AuthRepository) {
-				m.EXPECT().UserByEmail(mock.Anything, "test@test.com").
-					Once().Return(&muzz.User{
+			setupMockRepo: func(ma *mockservice.Authenticator, mu *mockservice.UserRepository) {
+				ma.EXPECT().
+					Authenticate(mock.Anything, "test@test.com", "Pa55w0rd!").
+					Once().Return("token", &muzz.User{
 					ID:       1,
 					Email:    "test@test.com",
 					Password: "Pa55w0rd!",
@@ -115,7 +87,7 @@ func TestAuthService_Login(t *testing.T) {
 					Age:      25,
 				}, nil)
 
-				m.EXPECT().UpdateUserLocation(mock.Anything, 1, orb.Point{1, 1}).
+				mu.EXPECT().UpdateUserLocation(mock.Anything, 1, orb.Point{1, 1}).
 					Once().Return(errors.New("database error"))
 			},
 			errMessage: "database error",
@@ -125,9 +97,10 @@ func TestAuthService_Login(t *testing.T) {
 
 	for _, tc := range errCases {
 		t.Run(tc.name, func(t *testing.T) {
-			m := mockservice.NewAuthRepository(t)
-			tc.setupMockRepo(m)
-			sut := newTestAuthService(t, m)
+			ma := mockservice.NewAuthenticator(t)
+			mu := mockservice.NewUserRepository(t)
+			tc.setupMockRepo(ma, mu)
+			sut := NewAuthService(ma, mu)
 
 			got, err := sut.Login(context.Background(), tc.input)
 			require.Empty(t, got)

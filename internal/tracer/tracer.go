@@ -3,7 +3,6 @@ package tracer
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"github.com/nickbadlose/muzz/internal/logger"
@@ -14,6 +13,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	"go.uber.org/zap"
 )
 
 type Config interface {

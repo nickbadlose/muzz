@@ -81,10 +81,10 @@ func main() {
 	matchAdapter := postgres.NewMatchAdapter(db)
 	userAdapter := postgres.NewUserAdapter(db)
 
-	authorizer := auth.NewAuthorizer(cfg)
+	authorizer := auth.NewAuthorizer(cfg, userAdapter)
 	loc := location.New(cfg, cache)
 
-	authService := service.NewAuthService(userAdapter, authorizer)
+	authService := service.NewAuthService(authorizer, userAdapter)
 	matchService := service.NewMatchService(matchAdapter)
 	userService := service.NewUserService(userAdapter)
 

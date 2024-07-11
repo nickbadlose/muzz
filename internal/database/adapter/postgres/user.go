@@ -13,6 +13,7 @@ import (
 	"github.com/paulmach/orb/encoding/ewkb"
 	"github.com/upper/db/v4"
 	"go.uber.org/zap"
+	"strings"
 )
 
 // TODO
@@ -54,8 +55,8 @@ func (ua *UserAdapter) CreateUser(ctx context.Context, in *muzz.CreateUserInput)
 	row, err := w.InsertInto(userTable).
 		Columns(columns[1:]...).
 		Values(
-			in.Email,
-			in.Password,
+			strings.ToLower(in.Email),
+			db.Raw(`crypt(?, gen_salt('bf'))`, in.Password),
 			in.Name,
 			in.Gender,
 			in.Age,
@@ -92,7 +93,7 @@ func (ua *UserAdapter) CreateUser(ctx context.Context, in *muzz.CreateUserInput)
 	}, nil
 }
 
-func (ua *UserAdapter) UserByEmail(ctx context.Context, email string) (*muzz.User, error) {
+func (ua *UserAdapter) Authenticate(ctx context.Context, email, password string) (*muzz.User, error) {
 	r, err := ua.database.ReadSessionContext(ctx)
 	if err != nil {
 		return nil, err
@@ -100,7 +101,11 @@ func (ua *UserAdapter) UserByEmail(ctx context.Context, email string) (*muzz.Use
 
 	// TODO index searching by email
 	columns := []interface{}{"id", "email", "password", "name", "gender", "age"}
-	row, err := r.Select(columns...).From(userTable).Where("email = ?", email).QueryRowContext(ctx)
+	row, err := r.Select(columns...).
+		From(userTable).
+		Where("email = ?", email).
+		And("password = crypt(?, password)", password).
+		QueryRowContext(ctx)
 	if err != nil {
 		return nil, err
 	}
