@@ -2,9 +2,9 @@ package postgres
 
 import (
 	"context"
-	"github.com/upper/db/v4"
 
 	"github.com/nickbadlose/muzz"
+	"github.com/upper/db/v4"
 )
 
 const (

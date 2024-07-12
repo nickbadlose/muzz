@@ -82,6 +82,7 @@ func furtherNestedFunc(l *zap.Logger) {
 
 With global logger:
 ```go
+// no need to parameter drill logger
 func furtherNestedFunc() {
 	// we want to log in here
 	logger.Error(...)
@@ -259,6 +260,10 @@ Execution Time: 5674.014 ms
 1 million users :) This query will definitely suffice for the time being. Also adding filters will improve the 
 execution time as we filter the users before joining with the swipe table.
 
+I've also added a LIMIT of 50 despite not being in the specs, since returning all users is bad, the nice thing about 
+the discover endpoint is that pagination isn't necessary since we exclude swiped users, it basically self paginates if 
+you simply add a limit. In reality, this limit would be client provided.
+
 **NOTE** - if you wish to test queries with more users, you can edit this [file](./scripts/go/migrations/seed_test_data/1_seed_random_data.up.sql)
 to use another number instead of the 10000 users we are using for analysis, the golang-migrate library we are using for
 migrations doesn't support query parameters, so you will need to manually edit it.
@@ -271,4 +276,8 @@ To do this, run:
 ./scripts/reset_db.sh true 
 ```
 
-This will clear all database volumes and reseed test data from scratch. The `true` flag denotes to seed test data. 
+This will clear all database volumes and reseed test data from scratch. The `true` flag denotes to seed test data.
+ 
+I have decorated our go `scripts/go/migrate.go` script with optional seeding, this would allow any other users to 
+utilise the seeding feature for testing their own future feature queries etc. Without the hassle of figuring it out 
+themselves.
