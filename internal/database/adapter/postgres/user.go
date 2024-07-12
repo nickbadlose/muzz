@@ -20,8 +20,9 @@ import (
 //  Strings.ToLower emails wherever set and read
 
 const (
-	userTable = "user"
-	srid      = 4326
+	userTable    = "user"
+	srid         = 4326
+	defaultLimit = 50
 )
 
 // UserAdapter adapts a *database.Database to the service.UserRepository interface.
@@ -46,16 +47,16 @@ type userEntity struct {
 }
 
 func (ua *UserAdapter) CreateUser(ctx context.Context, in *muzz.CreateUserInput) (*muzz.User, error) {
-	w, err := ua.database.WriteSessionContext(ctx)
+	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	columns := []string{"id", "email", "password", "name", "gender", "age", "location"}
-	row, err := w.InsertInto(userTable).
+	row, err := s.InsertInto(userTable).
 		Columns(columns[1:]...).
 		Values(
-			strings.ToLower(in.Email),
+			strings.TrimSpace(strings.ToLower(in.Email)),
 			db.Raw(`crypt(?, gen_salt('bf'))`, in.Password),
 			in.Name,
 			in.Gender,
@@ -94,14 +95,14 @@ func (ua *UserAdapter) CreateUser(ctx context.Context, in *muzz.CreateUserInput)
 }
 
 func (ua *UserAdapter) Authenticate(ctx context.Context, email, password string) (*muzz.User, error) {
-	r, err := ua.database.ReadSessionContext(ctx)
+	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	// TODO index searching by email
 	columns := []interface{}{"id", "email", "password", "name", "gender", "age"}
-	row, err := r.Select(columns...).
+	row, err := s.Select(columns...).
 		From(userTable).
 		Where("email = ?", email).
 		And("password = crypt(?, password)", password).
@@ -139,7 +140,7 @@ func (ua *UserAdapter) Authenticate(ctx context.Context, email, password string)
 //  then if you need to use some methods in transactions and isolation.
 //  You can pass in database.Reader/Writer into sub fn getUsers(ctx, tx, userID) ([]*userEntity, error)
 //  where tx can be either a transaction or read/write session based on the needs of the caller.
-//  Parent fn can just create ReadSessionContext or WriteSessionContext or tx and pass in.
+//  Parent fn can just create SQLSessionContext or WriteSessionContext or tx and pass in.
 //  Exclude already swiped users from results.
 //  Have tie breaker order by column? ID check if that's default anyway
 //  index for swiped user_id (SELECT swiped_user_id FROM swipe WHERE user_id = ?) seed data and analyze before and after indexes for distance, swiped user etc.
@@ -147,7 +148,7 @@ func (ua *UserAdapter) Authenticate(ctx context.Context, email, password string)
 //  Do we need entities, we are just converting to another object immediately
 
 func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]*muzz.UserDetails, error) {
-	r, err := ua.database.ReadSessionContext(ctx)
+	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -157,37 +158,45 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]
 		"u.name",
 		"u.gender",
 		"u.age",
-		// TODO remove location cast to geography?
+		// "/ 1000" converts from metres to km.
 		db.Raw(
-			`(u.location::geography <-> ST_SetSRID(ST_MakePoint(?,?),?)::geography) / 1000 AS distance`,
+			`(u.location <-> ST_SetSRID(ST_MakePoint(?,?),?)) / 1000 AS distance`,
 			in.Location.Lon(),
 			in.Location.Lat(),
 			srid,
 		),
 	}
 
-	order := in.SortType.String()
+	selector := s.Select(columns...).
+		From(fmt.Sprintf("%s %s", userTable, "u")).
+		// exclude the current user.
+		Where("u.id != ?", in.UserID).
+		// exclude any users they have already swiped.
+		And("u.id NOT IN ?", db.Raw(`(SELECT swiped_user_id FROM swipe WHERE user_id = ?)`, in.UserID))
+
+	var order any = in.SortType.String()
 	if in.SortType == muzz.SortTypeAttractiveness {
-		order = "-" + order
-		columns = append(
-			columns,
-			db.Raw(
-				`NULLIF((SELECT COUNT(swiped_user_id) FROM swipe WHERE 
-swiped_user_id = u.id AND preference = true),0)::float / 
-(SELECT COUNT(swiped_user_id) FROM swipe WHERE swiped_user_id = u.id)::float AS attractiveness`,
-			),
-		)
+		// attractiveness sorting algorithm: total_preferred_swipes / total_swipes
+		// total_preferred_swipes - swipes on the user where preferred = true
+		// total_swipes - total swipes on the user of either preference
+		// this gives us an attractiveness percentage, between 0 and 1.
+		//
+		// for the algorithm we need to count both values, so we join the user and swipe tables
+		// on swiped_user_id, so we can count the occurrences of the user.id column as the value
+		// for 'total_swipes' and by excluding cases where preference = false from the same count,
+		// we get 'total_preferred_swipes'.
+		selector = selector.LeftJoin(fmt.Sprintf("%s %s", swipeTable, "s")).
+			On("u.id = s.swiped_user_id").
+			// group the user rows into one for counting and removing duplicate users.
+			GroupBy("u.id")
+
+		order = db.Raw(`(NULLIF(sum(case when s.preference then 1 else 0 end),0)::float / COUNT(u.id)::float) DESC`)
 	}
 
-	selector := r.Select(columns...).
-		From(fmt.Sprintf("%s %s", userTable, "u")).
-		Where("u.id != ?", in.UserID).
-		And("u.id NOT IN ?", db.Raw(`(SELECT swiped_user_id FROM swipe WHERE user_id = ?)`, in.UserID)).
-		OrderBy(order)
-
-	selector = applyUserFilters(in.Filters, selector)
-
-	rows, err := selector.QueryContext(ctx)
+	rows, err := applyUserFilters(in.Filters, selector).
+		OrderBy(order).
+		Limit(defaultLimit).
+		QueryContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -200,12 +209,6 @@ swiped_user_id = u.id AND preference = true),0)::float /
 		user := new(muzz.UserDetails)
 		var genderStr string
 		dest := []any{&user.ID, &user.Name, &genderStr, &user.Age, &user.DistanceFromMe}
-
-		if in.SortType == muzz.SortTypeAttractiveness {
-			// We need to return this column as we use it to sort, but we have no business case for it
-			pseudoFloat := sql.NullFloat64{}
-			dest = append(dest, &pseudoFloat)
-		}
 
 		err = rows.Scan(dest...)
 		if err != nil {
@@ -233,12 +236,12 @@ swiped_user_id = u.id AND preference = true),0)::float /
 }
 
 func (ua *UserAdapter) UpdateUserLocation(ctx context.Context, id int, location orb.Point) error {
-	w, err := ua.database.WriteSessionContext(ctx)
+	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
 		return err
 	}
 
-	_, err = w.Update(userTable).
+	_, err = s.Update(userTable).
 		Set(db.Raw("location = ?", pointValue(location))).
 		Where("id = ?", id).
 		ExecContext(ctx)

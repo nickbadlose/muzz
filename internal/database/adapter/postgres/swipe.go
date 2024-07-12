@@ -2,9 +2,9 @@ package postgres
 
 import (
 	"context"
+	"github.com/upper/db/v4"
 
 	"github.com/nickbadlose/muzz"
-	"github.com/nickbadlose/muzz/internal/database"
 )
 
 const (
@@ -16,9 +16,9 @@ type swipeEntity struct {
 	preference               bool
 }
 
-func createSwipeWithTx(ctx context.Context, w database.Writer, in *muzz.CreateSwipeInput) (*swipeEntity, error) {
+func createSwipeWithTx(ctx context.Context, s db.SQL, in *muzz.CreateSwipeInput) (*swipeEntity, error) {
 	columns := []string{"id", "user_id", "swiped_user_id", "preference"}
-	row, err := w.InsertInto(swipeTable).
+	row, err := s.InsertInto(swipeTable).
 		Columns(columns[1:]...).
 		Values(in.UserID, in.SwipedUserID, in.Preference).
 		Returning(columns...).
@@ -36,9 +36,9 @@ func createSwipeWithTx(ctx context.Context, w database.Writer, in *muzz.CreateSw
 	return entity, nil
 }
 
-func getSwipeWithTx(ctx context.Context, r database.Reader, userID, swipedUserID int) (*swipeEntity, error) {
+func getSwipeWithTx(ctx context.Context, s db.SQL, userID, swipedUserID int) (*swipeEntity, error) {
 	columns := []interface{}{"id", "user_id", "swiped_user_id", "preference"}
-	row, err := r.Select(columns...).
+	row, err := s.Select(columns...).
 		From(swipeTable).
 		Where("user_id = ?", userID).
 		And("swiped_user_id = ?", swipedUserID).

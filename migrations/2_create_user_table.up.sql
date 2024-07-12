@@ -9,3 +9,7 @@ CREATE TABLE public.user (
     location geography(POINT,4326),
     CONSTRAINT unique_email UNIQUE (email)
 );
+
+-- Index the test table with a spherical index
+-- https://postgis.net/docs/manual-3.4/using_postgis_dbmanagement.html#Create_Geography_Tables
+CREATE INDEX user_gix ON "user" USING GIST ( location );

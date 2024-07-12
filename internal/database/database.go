@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"go.opentelemetry.io/otel"
 	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/upper/db/v4"
 	"github.com/upper/db/v4/adapter/postgresql"
 	"go.nhat.io/otelsql"
+	"go.opentelemetry.io/otel"
 )
 
 const (
@@ -44,16 +44,8 @@ type Credentials struct {
 // Database creates sessions for the client to interact with.
 type Database struct{ client db.Session }
 
-// ReadSessionContext returns the current database read session.
-func (d Database) ReadSessionContext(ctx context.Context) (Reader, error) {
-	if d.client == nil {
-		return nil, errNoConnection
-	}
-	return d.client.WithContext(ctx).SQL(), nil
-}
-
-// WriteSessionContext returns the current write database session.
-func (d Database) WriteSessionContext(ctx context.Context) (Writer, error) {
+// SQLSessionContext returns the current database SQL session.
+func (d Database) SQLSessionContext(ctx context.Context) (db.SQL, error) {
 	if d.client == nil {
 		return nil, errNoConnection
 	}

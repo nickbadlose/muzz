@@ -10,20 +10,29 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/database"
-	mockdatabase "github.com/nickbadlose/muzz/internal/database/mocks"
 	"github.com/paulmach/orb"
 	"github.com/stretchr/testify/require"
 	"github.com/upper/db/v4"
+	"github.com/upper/db/v4/adapter/postgresql"
 )
 
 func newTestDB(t *testing.T) (*database.Database, sqlmock.Sqlmock) {
-	dbClient, mockSQL, err := mockdatabase.NewWrappedMock()
+	mockDB, mockSQL, err := sqlmock.New()
+	require.NoError(t, err)
+
+	mockSQL.ExpectQuery(`SELECT CURRENT_DATABASE\(\) AS name`).
+		WillReturnRows(
+			sqlmock.NewRows([]string{`name`}).AddRow(`mock`),
+		)
+	session, err := postgresql.New(mockDB)
+	require.NoError(t, err)
+	require.NoError(t, mockSQL.ExpectationsWereMet())
 
 	dbase, err := database.New(
 		context.Background(),
 		&database.Credentials{},
 		database.WithClientFunc(func(_ context.Context, _ *database.Config) (db.Session, error) {
-			return dbClient, err
+			return session, err
 		}),
 	)
 
@@ -243,9 +252,9 @@ func TestUserAdapter_GetUsers(t *testing.T) {
 					)
 
 				m.ExpectQuery(`SELECT "u"."id", "u"."name", "u"."gender", "u"."age", 
-       \(u.location::geography <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)::geography\) / 1000 AS distance 
-FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
-                   ORDER BY "distance" ASC`).
+       \(u.location <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)\) / 1000 AS distance FROM "user" AS "u" 
+		WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
+		ORDER BY "distance" ASC LIMIT 50`).
 					WithArgs(-5.0527, 50.266, 4326, 1, 1).
 					WillReturnRows(rows)
 			},
@@ -276,9 +285,9 @@ FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id F
 					AddRows([][]driver.Value{{2, "test2", "male", 25, 3.123}}...)
 
 				m.ExpectQuery(`SELECT "u"."id", "u"."name", "u"."gender", "u"."age", 
-       \(u.location::geography <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)::geography\) / 1000 AS distance 
-FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\) 
-                              AND u.age >= \$6 AND u.age <= \$7 AND "u"."gender" IN \(\$8, \$9\)\) ORDER BY "distance" ASC`).
+       \(u.location <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)\) / 1000 AS distance FROM "user" AS "u" 
+		WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\) 
+		AND u.age >= \$6 AND u.age <= \$7 AND "u"."gender" IN \(\$8, \$9\)\) ORDER BY "distance" ASC LIMIT 50`).
 					WithArgs(-5.0527, 50.266, 4326, 1, 1, 20, 30, "male", "female").
 					WillReturnRows(rows)
 			},
@@ -307,20 +316,20 @@ FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id F
 				},
 			},
 			setupMock: func(m sqlmock.Sqlmock) {
-				rows := m.NewRows([]string{"id", "name", "gender", "age", "distance", "attractiveness"}).
+				rows := m.NewRows([]string{"id", "name", "gender", "age", "distance"}).
 					AddRows(
 						[][]driver.Value{
-							{6, "test6", "male", 34, 5.356, 1},
-							{2, "test2", "male", 25, 3.123, 0.666},
+							{6, "test6", "male", 34, 5.356},
+							{2, "test2", "male", 25, 3.123},
 						}...,
 					)
 
 				m.ExpectQuery(`SELECT "u"."id", "u"."name", "u"."gender", "u"."age", 
-       \(u.location::geography <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)::geography\) / 1000 AS distance, 
-       NULLIF\(\(SELECT COUNT\(swiped_user_id\) FROM swipe WHERE swiped_user_id = u.id AND preference = true\),0\)::float / 
-       \(SELECT COUNT\(swiped_user_id\) FROM swipe WHERE swiped_user_id = u.id\)::float AS attractiveness 
-FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
-                   ORDER BY "attractiveness" DESC`).
+       \(u.location <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)\) / 1000 AS distance FROM "user" AS "u" 
+        LEFT JOIN "swipe" AS "s" ON \(u.id = s.swiped_user_id\) WHERE \(u.id != \$4 AND u.id NOT IN 
+		\(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) GROUP BY "u"."id" 
+		ORDER BY \(NULLIF\(sum\(case when s.preference then 1 else 0 end\),0\)::float / COUNT\(u.id\)::float\) 
+		DESC LIMIT 50`).
 					WithArgs(-5.0527, 50.266, 4326, 1, 1).
 					WillReturnRows(rows)
 			},
@@ -350,9 +359,9 @@ FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id F
 			name: "query error",
 			setupMock: func(m sqlmock.Sqlmock) {
 				m.ExpectQuery(`SELECT "u"."id", "u"."name", "u"."gender", "u"."age", 
-       \(u.location::geography <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)::geography\) / 1000 AS distance 
-FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
-                   ORDER BY "distance" ASC`).
+       \(u.location <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)\) / 1000 AS distance FROM "user" AS "u" 
+		WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
+		ORDER BY "distance" ASC LIMIT 50`).
 					WithArgs(-5.0527, 50.266, 4326, 1, 1).
 					WillReturnError(errors.New("query error"))
 			},
@@ -367,9 +376,9 @@ FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id F
 				rows.RowError(0, errors.New("row error"))
 
 				m.ExpectQuery(`SELECT "u"."id", "u"."name", "u"."gender", "u"."age", 
-       \(u.location::geography <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)::geography\) / 1000 AS distance 
-FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
-                   ORDER BY "distance" ASC`).
+       \(u.location <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)\) / 1000 AS distance FROM "user" AS "u" 
+		WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
+		ORDER BY "distance" ASC LIMIT 50`).
 					WillReturnRows(rows).RowsWillBeClosed()
 			},
 			expectedMessage: "row error",
@@ -379,10 +388,10 @@ FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id F
 			setupMock: func(m sqlmock.Sqlmock) {
 				emptyRows := m.NewRows([]string{"id", "name", "gender", "age", "distance"})
 
-				m.ExpectQuery(`SELECT "u"."id", "u"."name", "u"."gender", "u"."age",
-		      \(u.location::geography <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)::geography\) / 1000 AS distance
-		FROM "user" AS "u" WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\)
-		                  ORDER BY "distance" ASC`).
+				m.ExpectQuery(`SELECT "u"."id", "u"."name", "u"."gender", "u"."age", 
+       \(u.location <-> ST_SetSRID\(ST_MakePoint\(\$1,\$2\),\$3\)\) / 1000 AS distance FROM "user" AS "u" 
+		WHERE \(u.id != \$4 AND u.id NOT IN \(SELECT swiped_user_id FROM swipe WHERE user_id = \$5\)\) 
+		ORDER BY "distance" ASC LIMIT 50`).
 					WillReturnRows(emptyRows)
 			},
 			expectedMessage: "no results found in database",

@@ -17,6 +17,7 @@ const (
 // TODO
 //  what is cleanest way to handle match table? one row that holds both users or 2 rows, one for each user?
 //  return errors from constructors or panic if params are nil?
+//  test New funcs throughout.
 
 // MatchAdapter adapts a *database.Database to the service.MatchRepository interface.
 type MatchAdapter struct {
@@ -91,7 +92,8 @@ func (ma *MatchAdapter) CreateSwipe(ctx context.Context, in *muzz.CreateSwipeInp
 	return match, nil
 }
 
-func createMatchWithTx(ctx context.Context, tx database.Writer, in []*muzz.CreateMatchInput) ([]*matchEntity, error) {
+// createMatchWithTx batch inserts a list of matches into the match table.
+func createMatchWithTx(ctx context.Context, tx db.SQL, in []*muzz.CreateMatchInput) ([]*matchEntity, error) {
 	columns := []string{"id", "user_id", "matched_user_id"}
 
 	bi := tx.InsertInto(matchTable).
