@@ -10,23 +10,23 @@ import (
 	"go.uber.org/zap"
 )
 
-// MatchRepository is the interface to write and read match/swipe data from the repository.
-type MatchRepository interface {
+// SwipeRepository is the interface to write and read match/swipe data from the repository.
+type SwipeRepository interface {
 	// CreateSwipe adds a swipe record to the repository and if appropriate, adds corresponding match records too.
 	CreateSwipe(context.Context, *muzz.CreateSwipeInput) (*muzz.Match, error)
 }
 
-// MatchService is the service which handles all match and swipe based requests.
-type MatchService struct {
-	repository MatchRepository
+// SwipeService is the service which handles all match and swipe based requests.
+type SwipeService struct {
+	repository SwipeRepository
 }
 
-// NewMatchService builds a new *MatchService.
-func NewMatchService(mr MatchRepository) (*MatchService, error) {
+// NewSwipeService builds a new *SwipeService.
+func NewSwipeService(mr SwipeRepository) (*SwipeService, error) {
 	if mr == nil {
 		return nil, errors.New("match repository cannot be nil")
 	}
-	return &MatchService{repository: mr}, nil
+	return &SwipeService{repository: mr}, nil
 }
 
 // Swipe performs a swipe action against a given user. There are 4 possible outcomes from this action:
@@ -39,8 +39,8 @@ func NewMatchService(mr MatchRepository) (*MatchService, error) {
 //     true, two match records will be created, one for each user, and one will be returned from the request.
 //
 // If there was no match, the returned muzz.Match will have Matched = false and ID = 0.
-func (ms *MatchService) Swipe(ctx context.Context, in *muzz.CreateSwipeInput) (*muzz.Match, *apperror.Error) {
-	logger.Debug(ctx, "MatchService Swipe", zap.Any("request", in))
+func (ms *SwipeService) Swipe(ctx context.Context, in *muzz.CreateSwipeInput) (*muzz.Match, *apperror.Error) {
+	logger.Debug(ctx, "SwipeService Swipe", zap.Any("request", in))
 
 	err := in.Validate()
 	if err != nil {

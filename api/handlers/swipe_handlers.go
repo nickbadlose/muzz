@@ -33,7 +33,7 @@ type SwipeResponse struct {
 
 // Render implements the render.Render interface.
 func (*SwipeResponse) Render(_ http.ResponseWriter, r *http.Request) error {
-	render.Status(r, http.StatusOK)
+	render.Status(r, http.StatusCreated)
 	return nil
 }
 
@@ -44,8 +44,7 @@ func (h *Handlers) Swipe(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.authorizer.UserFromContext(r.Context())
 	if err != nil {
 		logger.Error(r.Context(), "getting authenticated user from context", err)
-		err = render.Render(w, r, apperror.BadRequestHTTP(err))
-		logger.MaybeError(r.Context(), renderingErrorMessage, err)
+		logger.MaybeError(r.Context(), renderingErrorMessage, render.Render(w, r, apperror.BadRequestHTTP(err)))
 		return
 	}
 
@@ -61,11 +60,7 @@ func (h *Handlers) Swipe(w http.ResponseWriter, r *http.Request) {
 		Preference:   req.Preference,
 	})
 	if aErr != nil {
-		logger.MaybeError(
-			r.Context(),
-			renderingErrorMessage,
-			render.Render(w, r, aErr.ToHTTP()),
-		)
+		logger.MaybeError(r.Context(), renderingErrorMessage, render.Render(w, r, aErr.ToHTTP()))
 		return
 	}
 

@@ -28,6 +28,10 @@ Muzz tech test
 - Check all make functions and use correct methods ie len or cap with append or [i]
 - Use sql for transactions for match records, delete on cascade for user records and related data, even other users data such as swipes and matches.
 - Document providing IP in postman and manually providing for create user, so they don't all use your IP address.
+- Makefile for tests and dev ??
+- Use context signal to close deps in main?
+- Have test.env file for integration tests, run docker up with that env file in make file for tests, set env to test 
+  in tests. But use development, use maybe config_test for testing config, try and have config test file in config dir.
 
 ## Postman
 
@@ -110,6 +114,9 @@ func furtherNestedFunc() {
 	logger.Error(...)
 }
 ```
+
+You want to make logging as easy as possible for the user, the more difficult it is, the more likely they are to 
+decide against logging valuable information.
 
 TODO
 - package level doc - doc.go

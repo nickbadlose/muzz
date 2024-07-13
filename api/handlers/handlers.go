@@ -47,7 +47,7 @@ type Handlers struct {
 	location     Locationer
 	authService  *service.AuthService
 	userService  *service.UserService
-	matchService *service.MatchService
+	matchService *service.SwipeService
 }
 
 // New builds a new *Handlers.
@@ -57,7 +57,7 @@ func New(
 	l Locationer,
 	as *service.AuthService,
 	us *service.UserService,
-	ms *service.MatchService,
+	ms *service.SwipeService,
 ) (*Handlers, error) {
 	if cfg == nil {
 		return nil, errors.New("config cannot be nil")
@@ -104,11 +104,11 @@ func encodeResponse[T render.Renderer](w http.ResponseWriter, r *http.Request, d
 	return render.Render(w, r, v)
 }
 
+// decodeRequest renders a response error on failure.
 func decodeRequest[T any](w http.ResponseWriter, r *http.Request) (T, error) {
 	var v T
 	if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
-		err = render.Render(w, r, apperror.BadRequestHTTP(err))
-		logger.MaybeError(r.Context(), renderingErrorMessage, err)
+		logger.MaybeError(r.Context(), renderingErrorMessage, render.Render(w, r, apperror.BadRequestHTTP(err)))
 		return v, err
 	}
 

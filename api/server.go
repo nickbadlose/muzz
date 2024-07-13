@@ -31,7 +31,7 @@ func NewServer(cfg *config.Config, db *database.Database, c *cache.Cache, tp tra
 		return nil, errors.New("tracer provider cannot be nil")
 	}
 
-	matchAdapter, err := postgres.NewMatchAdapter(db)
+	matchAdapter, err := postgres.NewSwipeAdapter(db)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func NewServer(cfg *config.Config, db *database.Database, c *cache.Cache, tp tra
 	if err != nil {
 		return nil, err
 	}
-	matchService, err := service.NewMatchService(matchAdapter)
+	matchService, err := service.NewSwipeService(matchAdapter)
 	if err != nil {
 		return nil, err
 	}

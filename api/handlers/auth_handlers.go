@@ -42,8 +42,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 
 	location, err := h.location.ByIP(r.Context(), r.RemoteAddr)
 	if err != nil {
-		err = render.Render(w, r, apperror.InternalServerHTTP(err))
-		logger.MaybeError(r.Context(), renderingErrorMessage, err)
+		logger.MaybeError(r.Context(), renderingErrorMessage, render.Render(w, r, apperror.InternalServerHTTP(err)))
 		return
 	}
 
@@ -53,11 +52,7 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 		Location: location,
 	})
 	if aErr != nil {
-		logger.MaybeError(
-			r.Context(),
-			renderingErrorMessage,
-			render.Render(w, r, aErr.ToHTTP()),
-		)
+		logger.MaybeError(r.Context(), renderingErrorMessage, render.Render(w, r, aErr.ToHTTP()))
 		return
 	}
 

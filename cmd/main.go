@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/nickbadlose/muzz/api"
+	"go.uber.org/zap"
 	"log"
 	"os"
 	"os/signal"
@@ -37,7 +38,7 @@ func main() {
 
 	tp, err := tracer.New(cfg, applicationName)
 	if err != nil {
-		log.Fatalf("failed to initialise tracer: %s", err)
+		logger.Fatal(ctx, "failed to initialise tracer", zap.Error(err))
 	}
 
 	db, err := database.New(
@@ -52,7 +53,7 @@ func main() {
 		database.WithTraceProvider(tp),
 	)
 	if err != nil {
-		log.Fatalf("failed to initialise database: %s", err)
+		logger.Fatal(ctx, "failed to initialise database", zap.Error(err))
 	}
 
 	cache, err := internalcache.New(
@@ -65,12 +66,12 @@ func main() {
 		internalcache.WithTraceProvider(tp),
 	)
 	if err != nil {
-		log.Fatalf("failed to initialise cache: %s", err)
+		logger.Fatal(ctx, "failed to initialise cache", zap.Error(err))
 	}
 
 	srv, err := api.NewServer(cfg, db, cache, tp)
 	if err != nil {
-		log.Fatalf("failed to initialise server: %s", err)
+		logger.Fatal(ctx, "failed to initialise server", zap.Error(err))
 	}
 
 	go func() {
@@ -82,6 +83,10 @@ func main() {
 	}()
 
 	<-sig
+
+	// TODO Have sig creation and handling in go routine in api.NewServer?
+	//  listen for ctx.Done in here and when hit, close deps??
+
 	ctx, cancel := context.WithTimeout(ctx, idleTimeout)
 	defer cancel()
 	err = srv.Shutdown(ctx)

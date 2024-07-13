@@ -35,7 +35,6 @@ import (
 //  - try test main func
 //  - search fmt.Println and log and clear them if not for production
 //  - check each handler for potential errors, query errors etc.
-//  - trigger request decoding error for one
 
 // TODO for temp file - check if Create truncates if exists? I think it does. CreateTempDir?
 //// generate a temp file.
@@ -49,6 +48,9 @@ import (
 //		require.NoError(t, Close())
 //		require.NoError(t, os.Remove(f.Name()))
 //	})
+
+// TODO use actual geoip data for integration tests, since we cache data, it shouldn't be an issue spamming the service.
+//  It would be nice for it to not be dependant on an external service though.
 
 // mockLocation to mock getting the location from IP address. This is the only part of our integration tests we mock,
 // so we don't spam the geoip service.
@@ -65,7 +67,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 	require.NoError(t, err)
 
 	db := setupDB(t, cfg)
-	matchAdapter, err := postgres.NewMatchAdapter(db)
+	matchAdapter, err := postgres.NewSwipeAdapter(db)
 	require.NoError(t, err)
 	userAdapter, err := postgres.NewUserAdapter(db)
 	require.NoError(t, err)
@@ -75,7 +77,7 @@ func newTestServer(t *testing.T) *httptest.Server {
 
 	authService, err := service.NewAuthService(authorizer, userAdapter)
 	require.NoError(t, err)
-	matchService, err := service.NewMatchService(matchAdapter)
+	matchService, err := service.NewSwipeService(matchAdapter)
 	require.NoError(t, err)
 	userService, err := service.NewUserService(userAdapter)
 	require.NoError(t, err)
@@ -86,9 +88,9 @@ func newTestServer(t *testing.T) *httptest.Server {
 	tp, err := tracer.New(cfg, "muzz")
 	require.NoError(t, err)
 
-	router, err := router.New(cfg, hlr, authorizer, tp)
+	route, err := router.New(cfg, hlr, authorizer, tp)
 	require.NoError(t, err)
-	srv := httptest.NewServer(router)
+	srv := httptest.NewServer(route)
 	t.Cleanup(srv.Close)
 
 	return srv
@@ -180,17 +182,57 @@ func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	return db
 }
 
-func TestPublic_Success(t *testing.T) {
+func TestPublic(t *testing.T) {
 	cases := []struct {
-		endpoint, method string
-		body             interface{}
-		expectedCode     int
+		endpoint, method, description string
+		body                          interface{}
+		expectedCode                  int
 	}{
-		{endpoint: "status", method: http.MethodGet, expectedCode: http.StatusOK},
+		{
+			endpoint:     "status",
+			method:       http.MethodGet,
+			description:  "success",
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:     "user/create",
+			method:       http.MethodPost,
+			description:  "bad request",
+			body:         "bad request",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			endpoint:     "user/create",
+			method:       http.MethodPost,
+			description:  "invalid input",
+			body:         &handlers.CreateUserRequest{Email: "invalidemail"},
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			endpoint:     "login",
+			method:       http.MethodPost,
+			description:  "bad request",
+			body:         "bad request",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			endpoint:     "login",
+			method:       http.MethodPost,
+			description:  "invalid input",
+			body:         &handlers.LoginRequest{Email: "test@test.com"},
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			endpoint:     "login",
+			method:       http.MethodPost,
+			description:  "incorrect credentials",
+			body:         &handlers.LoginRequest{Email: "test@test.com", Password: "wrongPassword"},
+			expectedCode: http.StatusUnauthorized,
+		},
 	}
 
 	for _, tc := range cases {
-		t.Run(fmt.Sprintf("%s/%s", tc.method, tc.endpoint), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s/%s %s", tc.method, tc.endpoint, tc.description), func(t *testing.T) {
 			srv := newTestServer(t)
 
 			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), tc.body)
@@ -198,7 +240,17 @@ func TestPublic_Success(t *testing.T) {
 			testDir := getTestDataDirectory()
 			expected, err := os.ReadFile(filepath.Join(
 				testDir,
-				strings.ReplaceAll(fmt.Sprintf("%s.%s.json", tc.endpoint, tc.method), "/", "."),
+				strings.ReplaceAll(
+					fmt.Sprintf(
+						"%s.%s.%d.%s.json",
+						tc.endpoint,
+						tc.method,
+						tc.expectedCode,
+						strings.ReplaceAll(tc.description, " ", ""),
+					),
+					"/",
+					".",
+				),
 			))
 			require.NoError(t, err)
 
@@ -212,10 +264,225 @@ func TestPublic_Success(t *testing.T) {
 	}
 }
 
-// /user/create must be tested separately, the response isn't consistent since the password gets encrypted,
-// so we can't consistently assert the full response :(
-func TestUserCreate_Success(t *testing.T) {
-	t.Run("POST/user/create", func(t *testing.T) {
+func TestAuthenticated(t *testing.T) {
+	cases := []struct {
+		endpoint, method, description, queryParams, token string
+		body                                              interface{}
+		expectedCode                                      int
+		headers                                           []*header
+	}{
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "all users",
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "females 20 - 30",
+			queryParams:  "maxAge=30&minAge=20&genders=female",
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "males and unspecified",
+			queryParams:  "genders=male,unspecified",
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "sort type attractiveness",
+			queryParams:  "sort=attractiveness",
+			expectedCode: http.StatusOK,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "no results",
+			queryParams:  "maxAge=70&minAge=70&genders=female",
+			expectedCode: http.StatusNotFound,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "bad params",
+			queryParams:  "maxAge=notAnInt",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "invalidparams",
+			queryParams:  "minAge=25&maxAge=20",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			endpoint:     "discover",
+			method:       http.MethodGet,
+			description:  "no authorisation",
+			expectedCode: http.StatusUnauthorized,
+			headers: []*header{
+				{
+					key:   "Authorization",
+					value: fmt.Sprintf("Bearer %s", ""),
+				},
+			},
+		},
+		{
+			endpoint:    "swipe",
+			description: "match",
+			method:      http.MethodPost,
+			body: &handlers.SwipeRequest{
+				UserID:     2,
+				Preference: true,
+			},
+			expectedCode: http.StatusCreated,
+		},
+		{
+			endpoint:    "swipe",
+			description: "no match",
+			method:      http.MethodPost,
+			body: &handlers.SwipeRequest{
+				UserID:     3,
+				Preference: true,
+			},
+			expectedCode: http.StatusCreated,
+		},
+		{
+			endpoint:     "swipe",
+			method:       http.MethodPost,
+			description:  "bad request",
+			body:         "bad request",
+			expectedCode: http.StatusBadRequest,
+		},
+		{
+			endpoint:    "swipe",
+			method:      http.MethodPost,
+			description: "invalid input",
+			body: &handlers.SwipeRequest{
+				UserID:     1,
+				Preference: true,
+			},
+			expectedCode: http.StatusBadRequest,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s/%s %s", tc.method, tc.endpoint, tc.description), func(t *testing.T) {
+			srv := newTestServer(t)
+
+			loginData := makeRequest(
+				t,
+				http.MethodPost,
+				fmt.Sprintf("%s/%s", srv.URL, "login"),
+				&handlers.LoginRequest{
+					Email:    "test@test.com",
+					Password: "Pa55w0rd!",
+				},
+			)
+
+			loginRes := &handlers.LoginResponse{}
+			err := json.NewDecoder(loginData.Body).Decode(loginRes)
+			require.NoError(t, err)
+			require.NotEmpty(t, loginRes.Token)
+
+			headers := []*header{
+				{
+					key:   "Authorization",
+					value: fmt.Sprintf("Bearer %s", loginRes.Token),
+				},
+			}
+			if tc.headers != nil {
+				headers = append(headers, tc.headers...)
+			}
+
+			resp := makeRequest(
+				t,
+				tc.method,
+				fmt.Sprintf("%s/%s?%s", srv.URL, tc.endpoint, tc.queryParams),
+				tc.body,
+				headers...,
+			)
+
+			testDir := getTestDataDirectory()
+			expected, err := os.ReadFile(filepath.Join(
+				testDir,
+				strings.ReplaceAll(
+					fmt.Sprintf(
+						"%s.%s.%d.%s.json",
+						tc.endpoint,
+						tc.method,
+						tc.expectedCode,
+						strings.ReplaceAll(tc.description, " ", ""),
+					),
+					"/",
+					".",
+				),
+			))
+			require.NoError(t, err)
+
+			got, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+
+			require.JSONEq(t, string(expected), string(got))
+			require.Equal(t, tc.expectedCode, resp.StatusCode)
+		})
+	}
+}
+
+func TestAuthenticated_Unauthorised(t *testing.T) {
+	cases := []struct {
+		endpoint, method, token string
+	}{
+		{
+			endpoint: "discover",
+			method:   http.MethodGet,
+			token:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySUQiOjEsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6MzAwMCIsImF1ZCI6WyJodHRwOi8vbG9jYWxob3N0OjMwMDAiXSwiZXhwIjoxNzIwODgzODc3LCJuYmYiOjE3MjA4NDA2NzcsImlhdCI6MTcyMDg0MDY3N30.P9cknYtIi5WyfeDH6cYH-9Jdtxjsg_FB-WoNNacSSrs",
+		},
+		{
+			endpoint: "swipe",
+			method:   http.MethodPost,
+			token:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySUQiOjEsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6MzAwMCIsImF1ZCI6WyJodHRwOi8vbG9jYWxob3N0OjMwMDAiXSwiZXhwIjoxNzIwODgzODc3LCJuYmYiOjE3MjA4NDA2NzcsImlhdCI6MTcyMDg0MDY3N30.P9cknYtIi5WyfeDH6cYH-9Jdtxjsg_FB-WoNNacSSrs",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("POST/%s unauthorised", tc.endpoint), func(t *testing.T) {
+			srv := newTestServer(t)
+
+			resp := makeRequest(
+				t,
+				tc.method,
+				fmt.Sprintf("%s/%s", srv.URL, tc.endpoint),
+				nil,
+				&header{
+					key:   "Authorization",
+					value: fmt.Sprintf("Bearer %s", tc.token),
+				},
+			)
+
+			got, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+
+			require.JSONEq(
+				t,
+				`{"status": 401,"error": "token has invalid claims: token is expired"}`,
+				string(got),
+			)
+			require.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+		})
+	}
+}
+
+// Tests for any endpoints where the response isn't consistent so can't be asserted like the other requests.
+func TestInconsistentResponse(t *testing.T) {
+	// password gets encrypted.
+	t.Run("POST/user/create success", func(t *testing.T) {
 		srv := newTestServer(t)
 
 		resp := makeRequest(
@@ -258,117 +525,6 @@ func TestUserCreate_Success(t *testing.T) {
 			got,
 		)
 	})
-}
-
-func TestAuthenticated_Success(t *testing.T) {
-	cases := []struct {
-		endpoint, method, description, queryParams string
-		body                                       interface{}
-		expectedCode                               int
-	}{
-		{
-			endpoint:     "discover",
-			method:       http.MethodGet,
-			description:  "all users",
-			expectedCode: http.StatusOK,
-		},
-		{
-			endpoint:     "discover",
-			method:       http.MethodGet,
-			description:  "females 20 - 30",
-			queryParams:  "maxAge=30&minAge=20&genders=female",
-			expectedCode: http.StatusOK,
-		},
-		{
-			endpoint:     "discover",
-			method:       http.MethodGet,
-			description:  "males and unspecified",
-			queryParams:  "genders=male,unspecified",
-			expectedCode: http.StatusOK,
-		},
-		{
-			endpoint:     "discover",
-			method:       http.MethodGet,
-			description:  "sort type attractiveness",
-			queryParams:  "sort=attractiveness",
-			expectedCode: http.StatusOK,
-		},
-		{
-			endpoint:    "swipe",
-			description: "match",
-			method:      http.MethodPost,
-			body: &handlers.SwipeRequest{
-				UserID:     2,
-				Preference: true,
-			},
-			expectedCode: http.StatusOK,
-		},
-		{
-			endpoint:    "swipe",
-			description: "no match",
-			method:      http.MethodPost,
-			body: &handlers.SwipeRequest{
-				UserID:     3,
-				Preference: true,
-			},
-			expectedCode: http.StatusOK,
-		},
-	}
-
-	for _, tc := range cases {
-		t.Run(fmt.Sprintf("%s/%s %s", tc.method, tc.endpoint, tc.description), func(t *testing.T) {
-			srv := newTestServer(t)
-
-			loginData := makeRequest(
-				t,
-				http.MethodPost,
-				fmt.Sprintf("%s/%s", srv.URL, "login"),
-				&handlers.LoginRequest{
-					Email:    "test@test.com",
-					Password: "Pa55w0rd!",
-				},
-			)
-
-			loginRes := &handlers.LoginResponse{}
-			err := json.NewDecoder(loginData.Body).Decode(loginRes)
-			require.NoError(t, err)
-			require.NotEmpty(t, loginRes.Token)
-
-			resp := makeRequest(
-				t,
-				tc.method,
-				fmt.Sprintf("%s/%s?%s", srv.URL, tc.endpoint, tc.queryParams),
-				tc.body,
-				&header{
-					key:   "Authorization",
-					value: fmt.Sprintf("Bearer %s", loginRes.Token),
-				},
-			)
-
-			testDir := getTestDataDirectory()
-			expected, err := os.ReadFile(filepath.Join(
-				testDir,
-				strings.ReplaceAll(
-					fmt.Sprintf(
-						"%s.%s.%s.json",
-						tc.endpoint,
-						tc.method,
-						strings.ReplaceAll(tc.description, " ", ""),
-					),
-					"/",
-					".",
-				),
-			))
-			require.NoError(t, err)
-
-			got, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			require.NoError(t, resp.Body.Close())
-
-			require.JSONEq(t, string(expected), string(got))
-			require.Equal(t, tc.expectedCode, resp.StatusCode)
-		})
-	}
 }
 
 func getTestDataDirectory() string {

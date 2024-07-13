@@ -101,7 +101,7 @@ func (a *Authoriser) Authorise(token string) (int, *apperror.Error) {
 			return 0, apperror.Unauthorised(err)
 		}
 
-		return 0, apperror.Internal(err)
+		return 0, apperror.Unauthorised(err)
 	}
 
 	_, ok := tkn.Claims.(*Claims)

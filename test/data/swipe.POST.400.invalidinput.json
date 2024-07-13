@@ -1,0 +1,4 @@
+{
+  "status": 400,
+  "error": "user id and swiped user id cannot be the same value"
+}

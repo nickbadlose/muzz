@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestMatchAdapter(t *testing.T) (*MatchAdapter, sqlmock.Sqlmock) {
+func newTestMatchAdapter(t *testing.T) (*SwipeAdapter, sqlmock.Sqlmock) {
 	dbase, mock := newTestDB(t)
-	ma, err := NewMatchAdapter(dbase)
+	ma, err := NewSwipeAdapter(dbase)
 	require.NoError(t, err)
 	return ma, mock
 }
