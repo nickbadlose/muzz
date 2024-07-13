@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,7 +33,22 @@ import (
 //  - have migrations_test.go file in here which test constraints etc.
 //  - try t.parallel to speed these up, I think it might fail if all accessing same db, is there a way to fix that?
 //  - try test main func
-//  - search fmt.Println and log. and TODO
+//  - search fmt.Println and log and clear them if not for production
+//  - check each handler for potential errors, query errors etc.
+//  - trigger request decoding error for one
+
+// TODO for temp file - check if Create truncates if exists? I think it does. CreateTempDir?
+//// generate a temp file.
+//	f, err := os.CreateTemp("", "logger-test-*")
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	// defer that we remove the temp file and close the logger.
+//	t.Cleanup(func() {
+//		require.NoError(t, Close())
+//		require.NoError(t, os.Remove(f.Name()))
+//	})
 
 // mockLocation to mock getting the location from IP address. This is the only part of our integration tests we mock,
 // so we don't spam the geoip service.
@@ -51,16 +65,23 @@ func newTestServer(t *testing.T) *httptest.Server {
 	require.NoError(t, err)
 
 	db := setupDB(t, cfg)
-	matchAdapter := postgres.NewMatchAdapter(db)
-	userAdapter := postgres.NewUserAdapter(db)
+	matchAdapter, err := postgres.NewMatchAdapter(db)
+	require.NoError(t, err)
+	userAdapter, err := postgres.NewUserAdapter(db)
+	require.NoError(t, err)
 
-	authorizer := auth.NewAuthorizer(cfg, userAdapter)
+	authorizer, err := auth.NewAuthoriser(cfg, userAdapter)
+	require.NoError(t, err)
 
-	authService := service.NewAuthService(authorizer, userAdapter)
-	matchService := service.NewMatchService(matchAdapter)
-	userService := service.NewUserService(userAdapter)
+	authService, err := service.NewAuthService(authorizer, userAdapter)
+	require.NoError(t, err)
+	matchService, err := service.NewMatchService(matchAdapter)
+	require.NoError(t, err)
+	userService, err := service.NewUserService(userAdapter)
+	require.NoError(t, err)
 
-	hlr := handlers.New(cfg, authorizer, &mockLocation{}, authService, userService, matchService)
+	hlr, err := handlers.New(cfg, authorizer, &mockLocation{}, authService, userService, matchService)
+	require.NoError(t, err)
 
 	tp, err := tracer.New(context.Background(), cfg, "muzz")
 	require.NoError(t, err)
@@ -72,8 +93,6 @@ func newTestServer(t *testing.T) *httptest.Server {
 }
 
 func setupDB(t *testing.T, cfg *config.Config) *database.Database {
-	// TODO don't continue on errorNoChange, it means some migrations haven't run correctly?
-
 	// create test DB migrator to set up and teardown test db.
 	// You can't drop a database whilst connections still exist, so we authenticate to the postgres DB to run these.
 	createTestDBMigrator, err := migrate.New(
@@ -88,18 +107,14 @@ func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		err = createTestDBMigrator.Down()
-		if !errors.Is(err, migrate.ErrNoChange) {
-			require.NoError(t, err)
-		}
+		require.NoError(t, err)
 		sErr, dErr := createTestDBMigrator.Close()
 		require.NoError(t, sErr)
 		require.NoError(t, dErr)
 	})
 
 	err = createTestDBMigrator.Up()
-	if !errors.Is(err, migrate.ErrNoChange) {
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 
 	// TODO run appMigrator.Drop at the start of each migration to clear all data if db already existed
 	// app migrator to run all application migrations.
@@ -122,9 +137,7 @@ func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	})
 
 	err = appMigrator.Up()
-	if !errors.Is(err, migrate.ErrNoChange) {
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 
 	// seed migrator seeds any test data into the database. Golang-migrate requires multiple schema tables to run
 	// multiple separate migration folders against the same DB, so we specify a seed schema table for these,
@@ -141,7 +154,6 @@ func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		fmt.Println("seedMigrator.Down()")
 		err = seedMigrator.Down()
 		require.NoError(t, err)
 		sErr, dErr := seedMigrator.Close()
@@ -150,9 +162,7 @@ func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	})
 
 	err = seedMigrator.Up()
-	if !errors.Is(err, migrate.ErrNoChange) {
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 
 	db, err := database.New(context.Background(), &database.Credentials{
 		Username: cfg.DatabaseUser(),
@@ -168,7 +178,40 @@ func setupDB(t *testing.T, cfg *config.Config) *database.Database {
 	return db
 }
 
-// password gets encrypted, so we can't consistently assert the full response
+func TestPublic_Success(t *testing.T) {
+	cases := []struct {
+		endpoint, method string
+		body             interface{}
+		expectedCode     int
+	}{
+		{endpoint: "status", method: http.MethodGet, expectedCode: http.StatusOK},
+	}
+
+	for _, tc := range cases {
+		t.Run(fmt.Sprintf("%s/%s", tc.method, tc.endpoint), func(t *testing.T) {
+			srv := newTestServer(t)
+
+			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), tc.body)
+
+			testDir := getTestDataDirectory()
+			expected, err := os.ReadFile(filepath.Join(
+				testDir,
+				strings.ReplaceAll(fmt.Sprintf("%s.%s.json", tc.endpoint, tc.method), "/", "."),
+			))
+			require.NoError(t, err)
+
+			got, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+
+			require.JSONEq(t, string(expected), string(got))
+			require.Equal(t, tc.expectedCode, resp.StatusCode)
+		})
+	}
+}
+
+// /user/create must be tested separately, the response isn't consistent since the password gets encrypted,
+// so we can't consistently assert the full response :(
 func TestUserCreate_Success(t *testing.T) {
 	t.Run("POST/user/create", func(t *testing.T) {
 		srv := newTestServer(t)
@@ -215,39 +258,7 @@ func TestUserCreate_Success(t *testing.T) {
 	})
 }
 
-func TestPublic(t *testing.T) {
-	cases := []struct {
-		endpoint, method string
-		body             interface{}
-		expectedCode     int
-	}{
-		{endpoint: "status", method: http.MethodGet, expectedCode: http.StatusOK},
-	}
-
-	for _, tc := range cases {
-		t.Run(fmt.Sprintf("%s/%s", tc.method, tc.endpoint), func(t *testing.T) {
-			srv := newTestServer(t)
-
-			resp := makeRequest(t, tc.method, fmt.Sprintf("%s/%s", srv.URL, tc.endpoint), tc.body)
-
-			testDir := getTestDataDirectory()
-			expected, err := os.ReadFile(filepath.Join(
-				testDir,
-				strings.ReplaceAll(fmt.Sprintf("%s.%s.json", tc.endpoint, tc.method), "/", "."),
-			))
-			require.NoError(t, err)
-
-			got, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-			require.NoError(t, resp.Body.Close())
-
-			require.JSONEq(t, string(expected), string(got))
-			require.Equal(t, tc.expectedCode, resp.StatusCode)
-		})
-	}
-}
-
-func TestAuthenticated(t *testing.T) {
+func TestAuthenticated_Success(t *testing.T) {
 	cases := []struct {
 		endpoint, method, description, queryParams string
 		body                                       interface{}

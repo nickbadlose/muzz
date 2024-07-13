@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -69,7 +68,10 @@ func main() {
 		*db,
 	)
 
-	confirmDatabaseConnection(dsn)
+	err := confirmDatabaseConnection(dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for _, mig := range migrations {
 		printfGreen(mig.message)
@@ -81,7 +83,7 @@ func main() {
 			migrationDSN,
 		)
 		if err != nil {
-			log.Fatalf("initializing migrator: %s", err)
+			log.Fatalf("initialising migrator: %s", err)
 		}
 
 		err = m.Up()
@@ -102,14 +104,15 @@ func main() {
 }
 
 // confirm whether the database is accepting connections.
-func confirmDatabaseConnection(dsn string) {
-	var connected = make(chan struct{})
+func confirmDatabaseConnection(dsn string) error {
+	var connected, errored = make(chan struct{}), make(chan error)
 
 	go func() {
 		log.Println("checking if database is accepting connections...")
 		conn, err := sql.Open(driverName, dsn)
 		if err != nil {
-			log.Fatalf("could not open database: %s", err)
+			errored <- err
+			return
 		}
 
 		for {
@@ -131,10 +134,12 @@ func confirmDatabaseConnection(dsn string) {
 
 	select {
 	case <-time.After(defaultTimeout):
-		log.Fatal("timed out whilst waiting for database to accept connections")
+		return errors.New("timed out whilst waiting for database to accept connections")
+	case err := <-errored:
+		return err
 	case <-connected:
 		printfGreen("database is accepting connections")
-		return
+		return nil
 	}
 }
 
@@ -142,7 +147,6 @@ func confirmDatabaseConnection(dsn string) {
 func printfSuccess(msg string, args ...any) {
 	successMsg := fmt.Sprintf(msg, args...)
 	fmt.Printf("\x1b[32;1m%s\x1b[0m\n", successMsg)
-	os.Exit(0)
 }
 
 // printfGreen prints a green message to stdout.

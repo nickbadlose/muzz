@@ -8,7 +8,7 @@ import (
 // Option is an interface which allows us to apply options to the config.
 type Option interface{ apply(*zap.Config) }
 
-// optionFunc is a helper function which implements Option
+// optionFunc is a helper function which implements Option.
 type optionFunc func(*zap.Config)
 
 // apply implements Option interface.

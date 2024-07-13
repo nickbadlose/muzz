@@ -13,7 +13,9 @@ import (
 
 func newTestMatchAdapter(t *testing.T) (*MatchAdapter, sqlmock.Sqlmock) {
 	dbase, mock := newTestDB(t)
-	return NewMatchAdapter(dbase), mock
+	ma, err := NewMatchAdapter(dbase)
+	require.NoError(t, err)
+	return ma, mock
 }
 
 func TestMatchAdapter_CreateSwipe(t *testing.T) {

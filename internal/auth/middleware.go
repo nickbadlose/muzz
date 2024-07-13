@@ -16,7 +16,7 @@ const (
 )
 
 // NewHTTPMiddleware returns a middleware that authenticates the request JWT and sets the user ID on context.
-func NewHTTPMiddleware(authorizer *Authorizer) func(next http.Handler) http.Handler {
+func NewHTTPMiddleware(authorizer *Authoriser) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			bearerToken := r.Header.Get(authorizationHeader)
@@ -31,7 +31,7 @@ func NewHTTPMiddleware(authorizer *Authorizer) func(next http.Handler) http.Hand
 			}
 			jwt := splitBearer[1]
 
-			userID, err := authorizer.Authorize(jwt)
+			userID, err := authorizer.Authorise(jwt)
 			if err != nil {
 				logger.MaybeError(
 					r.Context(),

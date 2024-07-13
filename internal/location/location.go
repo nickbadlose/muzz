@@ -17,26 +17,37 @@ import (
 )
 
 const (
-	// TODO change to 1 day
-	// length of time to store cached geoip data for
-	cacheDuration = time.Hour * 24 * 7
+	// length of time to cache the geoip response for.
+	cacheDuration = time.Hour * 24
 )
 
+// Config is the interface to retrieve configuration secrets from the environment.
 type Config interface {
+	// GeoIPEndpoint retrieves the geo IP endpoint.
 	GeoIPEndpoint() string
+	// GeoIPAPIKey retrieves the geo IP API key.
 	GeoIPAPIKey() string
 }
 
+// Location is the service which handles all location based queries.
 type Location struct {
 	config Config
 	cache  *cache.Cache
 	client *http.Client
 }
 
-func New(cfg Config, ca *cache.Cache) *Location {
-	return &Location{config: cfg, cache: ca, client: http.DefaultClient}
+// New builds a new *Location.
+func New(cfg Config, ca *cache.Cache) (*Location, error) {
+	if cfg == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+	if ca == nil {
+		return nil, errors.New("cache cannot be nil")
+	}
+	return &Location{config: cfg, cache: ca, client: http.DefaultClient}, nil
 }
 
+// the expected response from the geo IP service.
 type geoIPResponse struct {
 	Lat float64 `json:"latitude"`
 	Lon float64 `json:"longitude"`
@@ -44,23 +55,24 @@ type geoIPResponse struct {
 	Error *errResponse `json:"error,omitempty"`
 }
 
+// the expected error response from the geo IP service.
 type errResponse struct {
 	Code int    `json:"code"`
 	Type string `json:"type"`
 	Info string `json:"info"`
 }
 
-// TODO trace request
-
-// ByIP performs a geoip query to retrieve a lat and long from a source ip address.
-func (l *Location) ByIP(ctx context.Context, sourceIp string) (orb.Point, error) {
-	ip := net.ParseIP(sourceIp)
+// ByIP performs a geoip query to retrieve latitude and longitude coordinates from a source ip address.
+//
+// Responses are cached in redis for 1 since IP location data rarely changes using the endpoint as the key.
+func (l *Location) ByIP(ctx context.Context, sourceIP string) (orb.Point, error) {
+	ip := net.ParseIP(sourceIP)
 	if ip.IsLoopback() || ip.IsUnspecified() {
-		logger.Warn(ctx, "could not parse ip", zap.String("ip", sourceIp))
-		sourceIp = "" // use the default.
+		logger.Warn(ctx, "could not parse ip", zap.String("ip", sourceIP))
+		sourceIP = "" // use the default.
 	}
 
-	u, err := url.Parse(fmt.Sprintf("%s/%s", l.config.GeoIPEndpoint(), sourceIp))
+	u, err := url.Parse(fmt.Sprintf("%s/%s", l.config.GeoIPEndpoint(), sourceIP))
 	if err != nil {
 		logger.Error(ctx, "parsing url from env", err)
 		return orb.Point{}, err
@@ -83,7 +95,7 @@ func (l *Location) ByIP(ctx context.Context, sourceIp string) (orb.Point, error)
 		logger.Error(ctx, "getting geoip data from cache", err, zap.String("key", endpoint))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		logger.Error(ctx, "building new geoip request", err)
 		return orb.Point{}, err

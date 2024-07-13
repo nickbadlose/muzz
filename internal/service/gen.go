@@ -1,7 +1,5 @@
 package service
 
-// TODO docs for generating mocks
-
 // generates mock repositories.
 
 // nolint:lll // these are commands.

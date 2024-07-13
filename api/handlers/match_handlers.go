@@ -11,27 +11,35 @@ import (
 
 // SwipeRequest holds the required information to perform a swipe on a user.
 type SwipeRequest struct {
-	UserID     int  `json:"userID"`
+	// UserID is the id of the user record that the swipe action is being performed against.
+	UserID int `json:"userID"`
+	// Preference is whether the authenticated user would prefer to match with the swiped user.
 	Preference bool `json:"preference"`
 }
 
+// Match represents the match details to present to the client.
 type Match struct {
+	// Matched, true if the swipe resulted in a match.
 	Matched bool `json:"matched"`
-	MatchID int  `json:"matchID,omitempty"`
+	// MatchID is the unique identifier of the match record. Empty if Matched is false.
+	MatchID int `json:"matchID,omitempty"`
 }
 
 // SwipeResponse object to return to the client.
 type SwipeResponse struct {
+	// Result is the match record.
 	Result *Match `json:"result"`
 }
 
 // Render implements the render.Render interface.
-func (*SwipeResponse) Render(w http.ResponseWriter, r *http.Request) error {
+func (*SwipeResponse) Render(_ http.ResponseWriter, r *http.Request) error {
 	render.Status(r, http.StatusOK)
 	return nil
 }
 
 // Swipe sets a users swipe preference against another user in the application.
+//
+// If both users have swiped with preference as true to each other, match details are returned.
 func (h *Handlers) Swipe(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.authorizer.UserFromContext(r.Context())
 	if err != nil {

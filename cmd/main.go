@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/lib/pq"
 	"github.com/nickbadlose/muzz/api/handlers"
 	"github.com/nickbadlose/muzz/api/router"
 	"github.com/nickbadlose/muzz/config"
@@ -30,6 +31,7 @@ const (
 // TODO
 //  NewServer func which constructs server and abstracts it from here
 //  integration tests will need current setup due to location mocking
+//  Build cache, logger and db etc in here and pass into new server func which builds the rest from them
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -39,7 +41,7 @@ func main() {
 
 	err := logger.New(logger.WithLogLevelString(cfg.LogLevel()))
 	if err != nil {
-		log.Fatalf("failed to initialize logger: %s", err)
+		log.Fatalf("failed to initialise logger: %s", err)
 	}
 
 	sig := make(chan os.Signal, 1)
@@ -47,7 +49,7 @@ func main() {
 
 	tp, err := tracer.New(ctx, cfg, "muzz")
 	if err != nil {
-		log.Fatalf("failed to initialize tracer: %s", err)
+		log.Fatalf("failed to initialise tracer: %s", err)
 	}
 
 	db, err := database.New(
@@ -62,7 +64,7 @@ func main() {
 		database.WithTraceProvider(tp),
 	)
 	if err != nil {
-		log.Fatalf("failed to initialize database: %s", err)
+		log.Fatalf("failed to initialise database: %s", err)
 	}
 
 	cache, err := internalcache.New(
@@ -75,20 +77,44 @@ func main() {
 		internalcache.WithTraceProvider(tp),
 	)
 	if err != nil {
-		log.Fatalf("failed to initialize cache: %s", err)
+		log.Fatalf("failed to initialise cache: %s", err)
 	}
 
-	matchAdapter := postgres.NewMatchAdapter(db)
-	userAdapter := postgres.NewUserAdapter(db)
+	matchAdapter, err := postgres.NewMatchAdapter(db)
+	if err != nil {
+		log.Fatalf("failed to initialise match adapter: %s", err)
+	}
+	userAdapter, err := postgres.NewUserAdapter(db)
+	if err != nil {
+		log.Fatalf("failed to initialise user adapter: %s", err)
+	}
 
-	authorizer := auth.NewAuthorizer(cfg, userAdapter)
-	loc := location.New(cfg, cache)
+	authorizer, err := auth.NewAuthoriser(cfg, userAdapter)
+	if err != nil {
+		log.Fatalf("failed to initialise authorizer: %s", err)
+	}
+	loc, err := location.New(cfg, cache)
+	if err != nil {
+		log.Fatalf("failed to initialise location: %s", err)
+	}
 
-	authService := service.NewAuthService(authorizer, userAdapter)
-	matchService := service.NewMatchService(matchAdapter)
-	userService := service.NewUserService(userAdapter)
+	authService, err := service.NewAuthService(authorizer, userAdapter)
+	if err != nil {
+		log.Fatalf("failed to initialise auth service: %s", err)
+	}
+	matchService, err := service.NewMatchService(matchAdapter)
+	if err != nil {
+		log.Fatalf("failed to initialise match service: %s", err)
+	}
+	userService, err := service.NewUserService(userAdapter)
+	if err != nil {
+		log.Fatalf("failed to initialise user service: %s", err)
+	}
 
-	hlr := handlers.New(cfg, authorizer, loc, authService, userService, matchService)
+	hlr, err := handlers.New(cfg, authorizer, loc, authService, userService, matchService)
+	if err != nil {
+		log.Fatalf("failed to initialise handlers: %s", err)
+	}
 
 	// TODO server configuration
 	server := &http.Server{

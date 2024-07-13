@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/database"
@@ -13,14 +15,12 @@ import (
 	"github.com/paulmach/orb/encoding/ewkb"
 	"github.com/upper/db/v4"
 	"go.uber.org/zap"
-	"strings"
 )
 
-// TODO
-//  Strings.ToLower emails wherever set and read
-
 const (
-	userTable    = "user"
+	userTable = "user"
+	// nolint:revive // this is a URL.
+	// spatial reference identifier, https://postgis.net/docs/manual-3.4/using_postgis_dbmanagement.html#spatial_ref_sys:~:text=The%20columns%20are%3A-,srid,-An%20integer%20code
 	srid         = 4326
 	defaultLimit = 50
 )
@@ -30,22 +30,28 @@ type UserAdapter struct {
 	database *database.Database
 }
 
-func NewUserAdapter(d *database.Database) *UserAdapter {
-	return &UserAdapter{database: d}
+// NewUserAdapter builds a new *UserAdapter.
+func NewUserAdapter(d *database.Database) (*UserAdapter, error) {
+	if d == nil {
+		return nil, errors.New("database cannot be nil")
+	}
+	return &UserAdapter{database: d}, nil
 }
 
+// userEntity represents a row in the user table.
 type userEntity struct {
-	id             int
-	email          string
-	password       string
-	name           string
-	gender         string
-	age            int
-	location       orb.Point
-	distance       float64
-	attractiveness float64
+	id       int
+	email    string
+	password string
+	name     string
+	gender   string
+	age      int
+	location orb.Point
 }
 
+// CreateUser adds a user record to the user table.
+//
+// It encrypts the password and manipulates the email to remove whitespace and force lowercase.
 func (ua *UserAdapter) CreateUser(ctx context.Context, in *muzz.CreateUserInput) (*muzz.User, error) {
 	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
@@ -94,14 +100,16 @@ func (ua *UserAdapter) CreateUser(ctx context.Context, in *muzz.CreateUserInput)
 	}, nil
 }
 
+// Authenticate attempts to retrieve the a user record by matching with the provided email and password.
+//
+// It uses pgcrypto to compare the provided password with the stored encrypted one.
 func (ua *UserAdapter) Authenticate(ctx context.Context, email, password string) (*muzz.User, error) {
 	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO index searching by email
-	columns := []interface{}{"id", "email", "password", "name", "gender", "age"}
+	columns := []any{"id", "email", "password", "name", "gender", "age"}
 	row, err := s.Select(columns...).
 		From(userTable).
 		Where("email = ?", email).
@@ -114,7 +122,7 @@ func (ua *UserAdapter) Authenticate(ctx context.Context, email, password string)
 	entity := new(userEntity)
 	err = row.Scan(&entity.id, &entity.email, &entity.password, &entity.name, &entity.gender, &entity.age)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, apperror.NoResults
+		return nil, apperror.ErrNoResults
 	}
 	if err != nil {
 		return nil, err
@@ -135,25 +143,15 @@ func (ua *UserAdapter) Authenticate(ctx context.Context, email, password string)
 	}, nil
 }
 
-// TODO
-//  Not required for this project, but in the future you can use this pattern
-//  then if you need to use some methods in transactions and isolation.
-//  You can pass in database.Reader/Writer into sub fn getUsers(ctx, tx, userID) ([]*userEntity, error)
-//  where tx can be either a transaction or read/write session based on the needs of the caller.
-//  Parent fn can just create SQLSessionContext or WriteSessionContext or tx and pass in.
-//  Exclude already swiped users from results.
-//  Have tie breaker order by column? ID check if that's default anyway
-//  index for swiped user_id (SELECT swiped_user_id FROM swipe WHERE user_id = ?) seed data and analyze before and after indexes for distance, swiped user etc.
-//  Check all make functions and use correct methods ie len or cap with append or [i]
-//  Do we need entities, we are just converting to another object immediately
-
+// GetUsers retrieves a list of filtered user records from the table sorted by the provided sort type. A limit of 50
+// users are returned per request.
 func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]*muzz.UserDetails, error) {
 	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	columns := []interface{}{
+	columns := []any{
 		"u.id",
 		"u.name",
 		"u.gender",
@@ -229,12 +227,13 @@ func (ua *UserAdapter) GetUsers(ctx context.Context, in *muzz.GetUsersInput) ([]
 	}
 
 	if len(users) == 0 {
-		return nil, apperror.NoResults
+		return nil, apperror.ErrNoResults
 	}
 
 	return users, nil
 }
 
+// UpdateUserLocation updates a user records location field with the provided data.
 func (ua *UserAdapter) UpdateUserLocation(ctx context.Context, id int, location orb.Point) error {
 	s, err := ua.database.SQLSessionContext(ctx)
 	if err != nil {
@@ -276,6 +275,7 @@ func applyUserFilters(in *muzz.UserFilters, selector db.Selector) db.Selector {
 	return selector
 }
 
+// pointValue creates a postgres Point type from the given longitude and latitude points using srid = 4326.
 func pointValue(p orb.Point) *db.RawExpr {
 	return db.Raw("ST_SetSRID(ST_MakePoint(?,?),?)", p.Lon(), p.Lat(), srid)
 }

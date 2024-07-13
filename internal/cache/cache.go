@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
+	"github.com/mediocregopher/radix/v4"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"time"
-
-	"github.com/mediocregopher/radix/v4"
 )
 
 const (
@@ -162,7 +162,7 @@ func (c *Cache) Do(ctx context.Context, rcv any, cmd string, args ...any) error 
 	)
 	defer span.End()
 
-	// continue without tracing if none is set.
+	// continue without tracing if none is configured.
 	if !span.IsRecording() || !span.SpanContext().IsValid() {
 		return c.client.Do(ctx, action)
 	}

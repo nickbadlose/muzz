@@ -2,9 +2,6 @@ package auth
 
 import (
 	"context"
-	mockauth "github.com/nickbadlose/muzz/internal/auth/mocks"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"testing"
 	"time"
 
@@ -12,7 +9,10 @@ import (
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/apperror"
+	mockauth "github.com/nickbadlose/muzz/internal/auth/mocks"
 	"github.com/spf13/viper"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,17 +22,21 @@ func init() {
 	viper.Set("JWT_SECRET", "test")
 }
 
-func newTestAuthenticator(t *testing.T) (*Authorizer, *mockauth.Repository) {
+func newTestAuthenticator(t *testing.T) (*Authoriser, *mockauth.Repository) {
 	cfg, err := config.Load()
 	require.NoError(t, err)
 	m := mockauth.NewRepository(t)
-	return NewAuthorizer(cfg, m), m
+	au, err := NewAuthoriser(cfg, m)
+	require.NoError(t, err)
+	return au, m
 }
 
-func newTestAuthorizer(t *testing.T) *Authorizer {
+func newTestAuthorizer(t *testing.T) *Authoriser {
 	cfg, err := config.Load()
 	require.NoError(t, err)
-	return NewAuthorizer(cfg, mockauth.NewRepository(t))
+	au, err := NewAuthoriser(cfg, mockauth.NewRepository(t))
+	require.NoError(t, err)
+	return au
 }
 
 func TestAuthorizer_Authenticate(t *testing.T) {
@@ -74,7 +78,7 @@ func TestAuthorizer_Authenticate(t *testing.T) {
 			mock.Anything,
 			"test@test.com",
 			"Pa55w0rd!",
-		).Return(nil, apperror.NoResults)
+		).Return(nil, apperror.ErrNoResults)
 
 		token, user, err := au.Authenticate(
 			context.Background(),
@@ -109,7 +113,7 @@ func TestAuthorizer_Authorize(t *testing.T) {
 		require.Nil(t, err)
 		require.NotEmpty(t, token)
 
-		userID, err := au.Authorize(token)
+		userID, err := au.Authorise(token)
 		assert.Nil(t, err)
 		assert.Equal(t, 1, userID)
 	})
@@ -174,7 +178,7 @@ func TestAuthorizer_Authorize(t *testing.T) {
 			require.NoError(t, err)
 
 			au := newTestAuthorizer(t)
-			userID, aErr := au.Authorize(token)
+			userID, aErr := au.Authorise(token)
 			require.Error(t, aErr)
 			require.Equal(t, tc.errMessage, aErr.Error())
 			require.Equal(t, apperror.StatusUnauthorized, aErr.Status())
@@ -201,7 +205,7 @@ func TestAuthorizer_Authorize(t *testing.T) {
 		require.NoError(t, err)
 
 		au := newTestAuthorizer(t)
-		userID, aErr := au.Authorize(token)
+		userID, aErr := au.Authorise(token)
 		require.Error(t, aErr)
 		require.Equal(t, "token is expired", aErr.Error())
 		require.Equal(t, apperror.StatusUnauthorized, aErr.Status())

@@ -13,37 +13,54 @@ import (
 type userCtxKey string
 
 const (
-	// UserKey to store the user ID in context.
-	UserKey = userCtxKey("user")
+	// userKey to store the user ID in context.
+	userKey userCtxKey = "user"
 )
 
+// Config is the interface to retrieve configuration secrets from the environment.
 type Config interface {
+	// DomainName retrieves the domain name of the server.
 	DomainName() string
+	// JWTDuration retrieves the expiry duration of the generated JWTs.
 	JWTDuration() time.Duration
+	// JWTSecret retrieves the JWT signature to authorize with.
 	JWTSecret() string
 }
 
+// Repository is the interface to authenticate a user against the valid users records.
 type Repository interface {
+	// Authenticate the provided user credentials.
 	Authenticate(ctx context.Context, email, password string) (*muzz.User, error)
 }
 
-type Authorizer struct {
+// Authoriser is the service which handles all authentication and authorization based logic.
+type Authoriser struct {
 	config     Config
 	repository Repository
 }
 
-func NewAuthorizer(cfg Config, repo Repository) *Authorizer { return &Authorizer{cfg, repo} }
+// NewAuthoriser builds a new *Authoriser.
+func NewAuthoriser(cfg Config, repo Repository) (*Authoriser, error) {
+	if cfg == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+	if repo == nil {
+		return nil, errors.New("repository cannot be nil")
+	}
+	return &Authoriser{config: cfg, repository: repo}, nil
+}
 
 // Claims to store in the JWT.
 type Claims struct {
+	// UserID is the id of the authenticated user, this can be retrieved in subsequent requests.
 	UserID int `json:"userID"`
 	jwt.RegisteredClaims
 }
 
 // Authenticate the given credentials.
-func (a *Authorizer) Authenticate(ctx context.Context, email, password string) (string, *muzz.User, *apperror.Error) {
+func (a *Authoriser) Authenticate(ctx context.Context, email, password string) (string, *muzz.User, *apperror.Error) {
 	user, err := a.repository.Authenticate(ctx, email, password)
-	if errors.Is(err, apperror.NoResults) {
+	if errors.Is(err, apperror.ErrNoResults) {
 		return "", nil, apperror.IncorrectCredentials()
 	}
 	if err != nil {
@@ -72,16 +89,16 @@ func (a *Authorizer) Authenticate(ctx context.Context, email, password string) (
 	return tString, user, nil
 }
 
-// Authorize parses and authorizes the given request JWT, extracts the Claims and authorizes them,
-// returning the userID once successfully authorized.
-func (a *Authorizer) Authorize(token string) (int, *apperror.Error) {
+// Authorise parses and authorises the given request JWT, extracts the Claims and authorises them,
+// returning the userID once successfully authorised.
+func (a *Authoriser) Authorise(token string) (int, *apperror.Error) {
 	c := &Claims{}
-	tkn, err := jwt.ParseWithClaims(token, c, func(token *jwt.Token) (interface{}, error) {
+	tkn, err := jwt.ParseWithClaims(token, c, func(_ *jwt.Token) (any, error) {
 		return []byte(a.config.JWTSecret()), nil
 	})
 	if err != nil {
 		if errors.Is(err, jwt.ErrSignatureInvalid) {
-			return 0, apperror.Unauthorized(err)
+			return 0, apperror.Unauthorised(err)
 		}
 
 		return 0, apperror.Internal(err)
@@ -89,23 +106,23 @@ func (a *Authorizer) Authorize(token string) (int, *apperror.Error) {
 
 	_, ok := tkn.Claims.(*Claims)
 	if !ok {
-		return 0, apperror.Unauthorized(errors.New("unknown claims type"))
+		return 0, apperror.Unauthorised(errors.New("unknown claims type"))
 	}
 
 	if !tkn.Valid {
-		return 0, apperror.Unauthorized(errors.New("invalid jwt"))
+		return 0, apperror.Unauthorised(errors.New("invalid jwt"))
 	}
 
 	err = a.validateClaims(c)
 	if err != nil {
-		return 0, apperror.Unauthorized(err)
+		return 0, apperror.Unauthorised(err)
 	}
 
 	return c.UserID, nil
 }
 
-// validateClaims using the most recent Config values.
-func (a *Authorizer) validateClaims(c *Claims) error {
+// validateClaims using the current Config values.
+func (a *Authoriser) validateClaims(c *Claims) error {
 	if c.UserID == 0 {
 		return errors.New("token has no user associated with it")
 	}
@@ -131,8 +148,8 @@ func (a *Authorizer) validateClaims(c *Claims) error {
 }
 
 // UserFromContext attempts to retrieve the authenticated user from context.
-func (*Authorizer) UserFromContext(ctx context.Context) (int, error) {
-	uID, ok := ctx.Value(UserKey).(int)
+func (*Authoriser) UserFromContext(ctx context.Context) (int, error) {
+	uID, ok := ctx.Value(userKey).(int)
 	if !ok {
 		return 0, errors.New("authenticated user not on context")
 	}
@@ -141,6 +158,6 @@ func (*Authorizer) UserFromContext(ctx context.Context) (int, error) {
 }
 
 // UserOnContext sets the authenticated user on context.
-func (*Authorizer) UserOnContext(ctx context.Context, userID int) context.Context {
-	return context.WithValue(ctx, UserKey, userID)
+func (*Authoriser) UserOnContext(ctx context.Context, userID int) context.Context {
+	return context.WithValue(ctx, userKey, userID)
 }

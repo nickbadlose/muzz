@@ -21,7 +21,8 @@ type Config struct {
 	MaxOpenConns int
 	// ConnMaxLifetime sets the default maximum amount of time a connection may be reused.
 	ConnMaxLifetime time.Duration
-	// DebugEnabled whether debug settings should be configured.
+	// DebugEnabled whether debug settings should be configured. This value should be false in production, to avoid
+	// tracing sensitive information.
 	DebugEnabled bool
 	// TracerProvider for tracing queries
 	TracerProvider trace.TracerProvider
@@ -30,30 +31,37 @@ type Config struct {
 // Option is an interface which allows us to apply options to the config.
 type Option interface{ apply(*Config) }
 
-// optionFunc is a helper function which implements Option
+// optionFunc is a helper function which implements Option.
 type optionFunc func(*Config)
 
 // apply implements Option interface.
 func (o optionFunc) apply(cfg *Config) { o(cfg) }
 
+// WithClientFunc sets the client func to connect to the database with.
 func WithClientFunc(fn func(context.Context, *Config) (db.Session, error)) Option {
 	return optionFunc(func(cfg *Config) { cfg.clientFunc = fn })
 }
 
+// WithDebugMode sets the DebugEnabled configuration to true. This value should be false in production, to avoid
+// tracing sensitive information.
 func WithDebugMode(debugEnabled bool) Option {
 	return optionFunc(func(cfg *Config) { cfg.DebugEnabled = debugEnabled })
 }
 
+// WithTraceProvider sets the trace provider for tracing.
 func WithTraceProvider(tp trace.TracerProvider) Option {
 	return optionFunc(func(cfg *Config) { cfg.TracerProvider = tp })
 }
 
+// WithMaxIdleConns sets the MaxIdleConns configuration.
 func WithMaxIdleConns(n int) Option {
 	return optionFunc(func(cfg *Config) { cfg.MaxIdleConns = n })
 }
 
+// WithMaxOpenConns sets the MaxOpenConns configuration.
 func WithMaxOpenConns(n int) Option { return optionFunc(func(cfg *Config) { cfg.MaxOpenConns = n }) }
 
+// WithConnMaxLifetime sets the ConnMaxLifetime configuration.
 func WithConnMaxLifetime(t time.Duration) Option {
 	return optionFunc(func(cfg *Config) { cfg.ConnMaxLifetime = t })
 }

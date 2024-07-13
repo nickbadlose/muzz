@@ -15,7 +15,8 @@ import (
 func TestMatchService_Swipe(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		m := mockservice.NewMatchRepository(t)
-		sut := NewMatchService(m)
+		sut, err := NewMatchService(m)
+		require.NoError(t, err)
 
 		m.EXPECT().
 			CreateSwipe(mock.Anything, &muzz.CreateSwipeInput{
@@ -77,12 +78,13 @@ func TestMatchService_Swipe(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewMatchRepository(t)
 			tc.setupMockRepo(m)
-			sut := NewMatchService(m)
+			sut, err := NewMatchService(m)
+			require.NoError(t, err)
 
-			got, err := sut.Swipe(context.Background(), tc.input)
+			got, aErr := sut.Swipe(context.Background(), tc.input)
 			require.Empty(t, got)
-			require.Contains(t, err.Error(), tc.errMessage)
-			require.Equal(t, err.Status(), tc.errStatus)
+			require.Contains(t, aErr.Error(), tc.errMessage)
+			require.Equal(t, aErr.Status(), tc.errStatus)
 		})
 	}
 }

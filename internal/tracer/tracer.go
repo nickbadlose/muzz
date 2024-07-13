@@ -16,8 +16,11 @@ import (
 	"go.uber.org/zap"
 )
 
+// Config is the interface to retrieve configuration secrets from the environment.
 type Config interface {
+	// Env retrieves the environment of the application.
 	Env() string
+	// JaegerHost retrieves the host of the collector send traces to.
 	JaegerHost() string
 }
 

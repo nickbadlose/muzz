@@ -10,35 +10,24 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/database"
+	mockdatabase "github.com/nickbadlose/muzz/internal/database/mocks"
 	"github.com/paulmach/orb"
 	"github.com/stretchr/testify/require"
 	"github.com/upper/db/v4"
-	"github.com/upper/db/v4/adapter/postgresql"
 )
 
 func newTestDB(t *testing.T) (*database.Database, sqlmock.Sqlmock) {
-	mockDB, mockSQL, err := sqlmock.New()
+	dbClient, mockSQL, err := mockdatabase.NewWrappedMock()
 	require.NoError(t, err)
-
-	mockSQL.ExpectQuery(`SELECT CURRENT_DATABASE\(\) AS name`).
-		WillReturnRows(
-			sqlmock.NewRows([]string{`name`}).AddRow(`mock`),
-		)
-	session, err := postgresql.New(mockDB)
-	require.NoError(t, err)
-	require.NoError(t, mockSQL.ExpectationsWereMet())
 
 	dbase, err := database.New(
 		context.Background(),
 		&database.Credentials{},
 		database.WithClientFunc(func(_ context.Context, _ *database.Config) (db.Session, error) {
-			return session, err
+			return dbClient, nil
 		}),
 	)
-
-	if err != nil {
-		require.NoError(t, err)
-	}
+	require.NoError(t, err)
 
 	t.Cleanup(func() {
 		mockSQL.ExpectClose()
@@ -50,10 +39,10 @@ func newTestDB(t *testing.T) (*database.Database, sqlmock.Sqlmock) {
 
 func newTestUserAdapter(t *testing.T) (*UserAdapter, sqlmock.Sqlmock) {
 	dbase, mock := newTestDB(t)
-	return NewUserAdapter(dbase), mock
+	ua, err := NewUserAdapter(dbase)
+	require.NoError(t, err)
+	return ua, mock
 }
-
-// TODO add WithArgs to insert queries
 
 func TestUserAdapter_CreateUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {

@@ -6,6 +6,8 @@ CREATE TABLE public.swipe (
 
     CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES public.user (id) ON DELETE CASCADE,
     CONSTRAINT fk_swiped_user_id FOREIGN KEY (user_id) REFERENCES public.user (id) ON DELETE CASCADE,
+    -- no duplicate swipes.
     CONSTRAINT unique_swiped_user_per_user UNIQUE (user_id, swiped_user_id),
+    -- user cannot swipe on themselves.
     CONSTRAINT no_matching_user_ids CHECK (user_id <> swiped_user_id)
 );

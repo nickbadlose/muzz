@@ -11,6 +11,7 @@ const (
 	swipeTable = "swipe"
 )
 
+// swipeEntity represents a row in the swipe table.
 type swipeEntity struct {
 	id, userID, swipedUserID int
 	preference               bool
@@ -37,7 +38,7 @@ func createSwipeWithTx(ctx context.Context, s db.SQL, in *muzz.CreateSwipeInput)
 }
 
 func getSwipeWithTx(ctx context.Context, s db.SQL, userID, swipedUserID int) (*swipeEntity, error) {
-	columns := []interface{}{"id", "user_id", "swiped_user_id", "preference"}
+	columns := []any{"id", "user_id", "swiped_user_id", "preference"}
 	row, err := s.Select(columns...).
 		From(swipeTable).
 		Where("user_id = ?", userID).

@@ -4,17 +4,17 @@ import (
 	"errors"
 )
 
-type Swipe struct {
-	ID, UserID, SwipedUserID int
-	Preference               bool
-}
-
+// CreateSwipeInput to create a swipe record.
 type CreateSwipeInput struct {
-	UserID       int
+	// UserID is the id of the user record performing the swipe action.
+	UserID int
+	// SwipedUserID is the id of the user record that the swipe action was performed against.
 	SwipedUserID int
-	Preference   bool
+	// Preference is whether the user would prefer to match with the swiped user.
+	Preference bool
 }
 
+// Validate the CreateSwipeInput fields.
 func (in *CreateSwipeInput) Validate() error {
 	if in.UserID == 0 {
 		return errors.New("user id is a required field")

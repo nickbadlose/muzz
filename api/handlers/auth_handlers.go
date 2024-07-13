@@ -11,7 +11,9 @@ import (
 
 // LoginRequest holds the information required to log in.
 type LoginRequest struct {
-	Email    string `json:"email"`
+	// Email of the user to authenticate with.
+	Email string `json:"email"`
+	// Password of the user to authenticate with.
 	Password string `json:"password"`
 }
 
@@ -22,12 +24,15 @@ type LoginResponse struct {
 }
 
 // Render implements the render.Render interface.
-func (*LoginResponse) Render(w http.ResponseWriter, r *http.Request) error {
+func (*LoginResponse) Render(_ http.ResponseWriter, r *http.Request) error {
 	render.Status(r, http.StatusOK)
 	return nil
 }
 
-// Login logs the user into the application.
+// Login attempts to authenticate the provided user credentials and login to the application. The users location
+// is retrieved via their IP address and our user record is updated on successful authentication.
+//
+// On success a valid JWT is returned for authorization of future requests.
 func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeRequest[*LoginRequest](w, r)
 	if err != nil {

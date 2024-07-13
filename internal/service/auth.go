@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
@@ -9,25 +10,32 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO
-//  Check out github.com/deepmap/oapi-codegen /
-//  https://github.com/ThreeDotsLabs/wild-workouts-go-ddd-example/blob/master/internal/trainer/ports/openapi_api.gen.go
-//  for openai code gen docs
-//  Do some sort of docs, if README or swagger or something else
-
+// Authenticator is the interface to authenticate a user.
 type Authenticator interface {
+	// Authenticate the provided user credentials.
 	Authenticate(ctx context.Context, email, password string) (token string, user *muzz.User, err *apperror.Error)
 }
 
+// AuthService is the service which handles all authentication and authorization based requests.
 type AuthService struct {
-	repository    UserRepository
 	authenticator Authenticator
+	repository    UserRepository
 }
 
-func NewAuthService(auth Authenticator, ur UserRepository) *AuthService {
-	return &AuthService{ur, auth}
+// NewAuthService builds a new *AuthService.
+func NewAuthService(auth Authenticator, ur UserRepository) (*AuthService, error) {
+	if auth == nil {
+		return nil, errors.New("user repository cannot be nil")
+	}
+	if ur == nil {
+		return nil, errors.New("authenticator cannot be nil")
+	}
+	return &AuthService{repository: ur, authenticator: auth}, nil
 }
 
+// Login takes a users credentials, authenticates them and returns a token on success.
+//
+// If the user is successfully authenticated, the users location data is updated in the database.
 func (as *AuthService) Login(ctx context.Context, in *muzz.LoginInput) (string, *apperror.Error) {
 	logger.Debug(ctx, "AuthService Login", zap.Any("request", in))
 

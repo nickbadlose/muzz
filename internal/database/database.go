@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"time"
 
-	_ "github.com/lib/pq"
 	"github.com/upper/db/v4"
 	"github.com/upper/db/v4/adapter/postgresql"
 	"go.nhat.io/otelsql"
@@ -18,7 +17,7 @@ const (
 	// databaseDriver the name of the database driver to use.
 	databaseDriver = "postgres"
 
-	// db.Session configurations
+	// db.Session configurations.
 	maxIdleConnections = 2
 	maxOpenConnections = 5
 	maxConnLifetime    = 30 * time.Minute
@@ -99,16 +98,21 @@ func New(ctx context.Context, c *Credentials, opts ...Option) (*Database, error)
 	}
 
 	client, err := cfg.clientFunc(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
 
-	return &Database{client: client}, err
+	return &Database{client: client}, nil
 }
 
+// defaultClientFunc configures a db.Session with the given configurations and decorates it with trace information.
 var defaultClientFunc = func(ctx context.Context, cfg *Config) (db.Session, error) {
 	queryOpt := otelsql.TraceQueryWithoutArgs()
 	if cfg.DebugEnabled {
 		queryOpt = otelsql.TraceQueryWithArgs()
 	}
 
+	// register the trace provider with psql.
 	driverName, err := otelsql.Register(
 		databaseDriver,
 		otelsql.WithTracerProvider(cfg.TracerProvider),

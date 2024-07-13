@@ -15,7 +15,8 @@ import (
 func TestUserService_Create(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		m := mockservice.NewUserRepository(t)
-		sut := NewUserService(m)
+		sut, err := NewUserService(m)
+		require.NoError(t, err)
 
 		m.EXPECT().
 			CreateUser(mock.Anything, &muzz.CreateUserInput{
@@ -90,12 +91,13 @@ func TestUserService_Create(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewUserRepository(t)
 			tc.setupMockRepo(m)
-			sut := NewUserService(m)
+			sut, err := NewUserService(m)
+			require.NoError(t, err)
 
-			got, err := sut.Create(context.Background(), tc.input)
+			got, aErr := sut.Create(context.Background(), tc.input)
 			require.Nil(t, got)
-			require.Contains(t, err.Error(), tc.errMessage)
-			require.Equal(t, err.Status(), tc.errStatus)
+			require.Contains(t, aErr.Error(), tc.errMessage)
+			require.Equal(t, aErr.Status(), tc.errStatus)
 		})
 	}
 }
@@ -126,7 +128,8 @@ func TestUserService_Discover(t *testing.T) {
 			nil,
 		)
 
-		sut := NewUserService(m)
+		sut, err := NewUserService(m)
+		require.NoError(t, err)
 
 		got, err := sut.Discover(context.Background(), &muzz.GetUsersInput{
 			UserID:  1,
@@ -185,12 +188,13 @@ func TestUserService_Discover(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			m := mockservice.NewUserRepository(t)
 			tc.setupMockRepo(m)
-			sut := NewUserService(m)
+			sut, err := NewUserService(m)
+			require.NoError(t, err)
 
-			got, err := sut.Discover(context.Background(), tc.input)
+			got, aErr := sut.Discover(context.Background(), tc.input)
 			require.Empty(t, got)
-			require.Contains(t, err.Error(), tc.errMessage)
-			require.Equal(t, err.Status(), tc.errStatus)
+			require.Contains(t, aErr.Error(), tc.errMessage)
+			require.Equal(t, aErr.Status(), tc.errStatus)
 		})
 	}
 }

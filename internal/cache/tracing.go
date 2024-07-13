@@ -2,6 +2,8 @@ package cache
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/mediocregopher/radix/v4"
 	"github.com/nickbadlose/muzz/internal/tracer"
 	"go.opentelemetry.io/otel/trace"
@@ -39,10 +41,17 @@ func setTraceAttributes(span trace.Span, args []any) {
 		return
 	}
 
-	// TODO check this with setEx by clearing cache
-
 	// omit the key (first arg) as we always trace this at a higher level.
 	for i, arg := range args[1:] {
+		// the tracer lib doesn't handle non-standard types, so we need to type cast Duration
+		// to time.Duration to trace it
+		t, ok := arg.(Duration)
+		if ok {
+			span.SetAttributes(tracer.Attribute(
+				fmt.Sprintf("%s.%d", redisArgs, i),
+				time.Duration(t),
+			))
+		}
 		span.SetAttributes(tracer.Attribute(
 			fmt.Sprintf("%s.%d", redisArgs, i),
 			arg,

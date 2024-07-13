@@ -14,26 +14,33 @@ const (
 	matchTable = "match"
 )
 
-// TODO
-//  what is cleanest way to handle match table? one row that holds both users or 2 rows, one for each user?
-//  return errors from constructors or panic if params are nil?
-//  test New funcs throughout.
-
 // MatchAdapter adapts a *database.Database to the service.MatchRepository interface.
 type MatchAdapter struct {
 	database *database.Database
 }
 
-func NewMatchAdapter(d *database.Database) *MatchAdapter {
-	return &MatchAdapter{database: d}
+// NewMatchAdapter builds a new *MatchAdapter.
+func NewMatchAdapter(d *database.Database) (*MatchAdapter, error) {
+	if d == nil {
+		return nil, errors.New("database cannot be nil")
+	}
+	return &MatchAdapter{database: d}, nil
 }
 
+// matchEntity represents a row in the match table.
+//
+// upper db tags attached for batch inserting match rows.
 type matchEntity struct {
 	ID            int `db:"id"`
 	UserID        int `db:"user_id"`
 	MatchedUserID int `db:"matched_user_id"`
 }
 
+// CreateSwipe adds a swipe record to the swipe table and if appropriate, adds corresponding match records
+// to the match table too.
+//
+// This method runs as a transaction. If both the user record performing the action and the swiped user record have a
+// preference of true, then two match records are created, one for each user.
 func (ma *MatchAdapter) CreateSwipe(ctx context.Context, in *muzz.CreateSwipeInput) (*muzz.Match, error) {
 	match := &muzz.Match{}
 	err := ma.database.TxContext(ctx, func(tx db.Session) error {

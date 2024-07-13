@@ -63,7 +63,7 @@ func New(opts ...Option) error {
 	return nil
 }
 
-func addTraceId(ctx context.Context) zap.Field {
+func addTraceID(ctx context.Context) zap.Field {
 	span := trace.SpanFromContext(ctx)
 	traceID := span.SpanContext().TraceID().String()
 	return zap.String(traceIDKey, traceID)
@@ -71,7 +71,7 @@ func addTraceId(ctx context.Context) zap.Field {
 
 // decorateLogs with trace information.
 func decorateLogs(ctx context.Context, fn logFunc, msg string, fields ...Field) {
-	fn(msg, append(fields, addTraceId(ctx))...)
+	fn(msg, append(fields, addTraceID(ctx))...)
 }
 
 // wrapNoLogger helper func which wraps if the logger is not initialised.
@@ -121,7 +121,7 @@ func Debug(ctx context.Context, msg string, fields ...Field) {
 	wrapNoLogger(func() { decorateLogs(ctx, logger.Debug, msg, fields...) })
 }
 
-// Fatal logs with the Fatal log level. calling this will also cause an os.Exit(1)
+// Fatal logs with the Fatal log level. calling this will also cause an os.Exit(1).
 func Fatal(ctx context.Context, msg string, fields ...Field) {
 	wrapNoLogger(func() { decorateLogs(ctx, logger.Fatal, msg, fields...) })
 }

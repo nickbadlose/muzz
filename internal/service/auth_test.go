@@ -17,7 +17,8 @@ func TestAuthService_Login(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		mu := mockservice.NewUserRepository(t)
 		ma := mockservice.NewAuthenticator(t)
-		sut := NewAuthService(ma, mu)
+		sut, err := NewAuthService(ma, mu)
+		require.NoError(t, err)
 
 		ma.EXPECT().
 			Authenticate(mock.Anything, "test@test.com", "Pa55w0rd!").Once().Return(
@@ -100,12 +101,13 @@ func TestAuthService_Login(t *testing.T) {
 			ma := mockservice.NewAuthenticator(t)
 			mu := mockservice.NewUserRepository(t)
 			tc.setupMockRepo(ma, mu)
-			sut := NewAuthService(ma, mu)
+			sut, err := NewAuthService(ma, mu)
+			require.NoError(t, err)
 
-			got, err := sut.Login(context.Background(), tc.input)
+			got, aErr := sut.Login(context.Background(), tc.input)
 			require.Empty(t, got)
-			require.Contains(t, err.Error(), tc.errMessage)
-			require.Equal(t, err.Status(), tc.errStatus)
+			require.Contains(t, aErr.Error(), tc.errMessage)
+			require.Equal(t, aErr.Status(), tc.errStatus)
 		})
 	}
 }

@@ -5,8 +5,8 @@ import (
 	"net/http"
 )
 
-// NoResults represents when no requested records exist in the database.
-var NoResults = errors.New("no results found in database")
+// ErrNoResults represents when no requested records exist in the database.
+var ErrNoResults = errors.New("no results found in database")
 
 // Status code of an Error, represents the general reason for the error.
 type Status uint8
@@ -22,6 +22,8 @@ const (
 	StatusUnauthorized
 )
 
+// Error represents a muzz application error, the status can be pivoted on to convert to generic interface errors,
+// such as HTTP and gRPC.
 type Error struct {
 	status Status
 	error  error
@@ -47,7 +49,10 @@ func (e *Error) ToHTTP() *HTTPResponse {
 	}
 }
 
+// Status code of the error.
 func (e *Error) Status() Status { return e.status }
+
+// Error implements the error interface.
 func (e *Error) Error() string {
 	if e.error == nil {
 		return ""
@@ -55,6 +60,7 @@ func (e *Error) Error() string {
 	return e.error.Error()
 }
 
+// BadInput decorates the given error with a StatusBadInput.
 func BadInput(err error) *Error {
 	return &Error{
 		status: StatusBadInput,
@@ -62,6 +68,7 @@ func BadInput(err error) *Error {
 	}
 }
 
+// NotFound decorates the given error with a StatusNotFound.
 func NotFound(err error) *Error {
 	return &Error{
 		status: StatusNotFound,
@@ -69,6 +76,7 @@ func NotFound(err error) *Error {
 	}
 }
 
+// Internal decorates the given error with a StatusInternal.
 func Internal(err error) *Error {
 	return &Error{
 		status: StatusInternal,
@@ -76,13 +84,15 @@ func Internal(err error) *Error {
 	}
 }
 
-func Unauthorized(err error) *Error {
+// Unauthorised decorates the given error with a StatusUnauthorized.
+func Unauthorised(err error) *Error {
 	return &Error{
 		status: StatusUnauthorized,
 		error:  err,
 	}
 }
 
+// IncorrectCredentials Error for when a users authentication credentials are incorrect.
 func IncorrectCredentials() *Error {
 	return &Error{
 		status: StatusUnauthorized,
@@ -90,6 +100,7 @@ func IncorrectCredentials() *Error {
 	}
 }
 
+// NewErr build a new *Error.
 func NewErr(status Status, err error) *Error {
 	return &Error{
 		status: status,

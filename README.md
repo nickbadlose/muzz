@@ -18,10 +18,33 @@ Muzz tech test
 - postgis gis index for distance calculations, see docs
 - Think of edge cases for discover query, if any exist
 - Added a limit as responses for many users were too large
+- State validations are business logic.
+- TODO docs for generating mocks
+- Document how we would break app into separate sections as it grows, user section, with user subrouter and handlers, then eventually it's own microservice
+- Do some sort of docs, if README or swagger or something else
+- Test New funcs throughout
+- Check the specs before sending.
+- Make sure we can set up from scratch and run using docker only, not goland.
+- Check all make functions and use correct methods ie len or cap with append or [i]
+- Use sql for transactions for match records, delete on cascade for user records and related data, even other users data such as swipes and matches.
+- Document providing IP in postman and manually providing for create user, so they don't all use your IP address.
 
 ## Postman
 
 [Postman collection](https://www.postman.com/nickbadlose/workspace/muzz-api/collection/13188383-3d2cd57a-d0c4-43bb-ad64-0333f8a67deb?action=share&creator=13188383)
+
+## Linting
+
+To run the linter, you need to install [golangci-lint](https://golangci-lint.run/welcome/install/#local-installation).
+
+To run the linter, run:
+
+```bash
+golangci-lint run 
+```
+
+Linter configurations can be edited to suit desired project needs in `.golangci.yml`. See [here](https://golangci-lint.run/usage/configuration) 
+for available configurations.
 
 ## Database Package
 

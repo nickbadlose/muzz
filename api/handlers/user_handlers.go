@@ -1,55 +1,70 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz"
 	"github.com/nickbadlose/muzz/internal/apperror"
 	"github.com/nickbadlose/muzz/internal/logger"
 	"github.com/paulmach/orb"
-	"net/http"
 )
 
-// CreateUserRequest holds the information required to create a user.
+// CreateUserRequest holds the information required to create a user record.
 type CreateUserRequest struct {
-	Email    string   `json:"email"`
-	Password string   `json:"password"`
-	Name     string   `json:"name"`
-	Gender   string   `json:"gender"`
-	Age      int      `json:"age"`
+	// Email of the user.
+	Email string `json:"email"`
+	// Password of the user.
+	Password string `json:"password"`
+	// Name of the user.
+	Name string `json:"name"`
+	// Gender of the user.
+	Gender string `json:"gender"`
+	// Age of the user.
+	Age int `json:"age"`
+	// Location of the user at current.
 	Location Location `json:"location"`
 }
 
-// TODO remove from requests if using ip address
-
-// Location represents the geographic coordinates as longitude and latitude
+// Location represents the geographic coordinates as longitude and latitude.
 type Location struct {
+	// Lat is the latitude of the location.
 	Lat float64 `json:"latitude"`
+	// Lon is the longitude of the location.
 	Lon float64 `json:"longitude"`
 }
 
 // User represents the full user details to present to the client.
 type User struct {
-	ID       int      `json:"id"`
-	Email    string   `json:"email"`
-	Password string   `json:"password"`
-	Name     string   `json:"name"`
-	Gender   string   `json:"gender"`
-	Age      int      `json:"age"`
+	// ID is the unique identifier of the user record.
+	ID int `json:"id"`
+	// Email of the user record.
+	Email string `json:"email"`
+	// Password of the user record.
+	Password string `json:"password"`
+	// Name of the user record.
+	Name string `json:"name"`
+	// Gender of the user record.
+	Gender string `json:"gender"`
+	// Age of the user record.
+	Age int `json:"age"`
+	// Location of the user record on last login.
 	Location Location `json:"location"`
 }
 
 // UserResponse object to send to the client.
 type UserResponse struct {
+	// Result is the user record.
 	Result *User `json:"result"`
 }
 
 // Render implements the render.Render interface.
-func (*UserResponse) Render(w http.ResponseWriter, r *http.Request) error {
+func (*UserResponse) Render(_ http.ResponseWriter, r *http.Request) error {
 	render.Status(r, http.StatusCreated)
 	return nil
 }
 
-// CreateUser creates a user in the application.
+// CreateUser creates a user record in the application.
 func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	req, err := decodeRequest[CreateUserRequest](w, r)
 	if err != nil {
@@ -95,25 +110,37 @@ func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 
 // UserDetails represents the public user details to present to the client.
 type UserDetails struct {
-	ID             int     `json:"id"`
-	Name           string  `json:"name"`
-	Gender         string  `json:"gender"`
-	Age            int     `json:"age"`
+	// ID is the unique identifier of the user record.
+	ID int `json:"id"`
+	// Email of the user record.
+	// Name of the user record.
+	Name string `json:"name"`
+	// Gender of the user record.
+	Gender string `json:"gender"`
+	// Age of the user record.
+	Age int `json:"age"`
+	// DistanceFromMe is the user records distance from the authenticated user.
 	DistanceFromMe float64 `json:"distanceFromMe"`
 }
 
 // DiscoverResponse object to send to the client.
 type DiscoverResponse struct {
+	// Results are the user records.
 	Results []*UserDetails `json:"results"`
 }
 
 // Render implements the render.Render interface.
-func (*DiscoverResponse) Render(w http.ResponseWriter, r *http.Request) error {
+func (*DiscoverResponse) Render(_ http.ResponseWriter, r *http.Request) error {
 	render.Status(r, http.StatusOK)
 	return nil
 }
 
-// Discover all un-swiped users from the application.
+// Discover attempts to retrieve potential matches from the application data. Previously swiped users are excluded from
+// results and the results are filterable and sortable, based on the provided query parameters:
+//   - sort: muzz.SortType
+//   - maxAge: int
+//   - minAge: int
+//   - genders: []muzz.Gender
 func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 	userID, err := h.authorizer.UserFromContext(r.Context())
 	if err != nil {
@@ -135,11 +162,7 @@ func (h *Handlers) Discover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sortType := muzz.SortTypeDistance
-	sort := r.URL.Query().Get("sort")
-	if sort != "" {
-		sortType = muzz.SortValues[sort]
-	}
+	sortType := muzz.SortValues[r.URL.Query().Get("sort")]
 
 	location, err := h.location.ByIP(r.Context(), r.RemoteAddr)
 	if err != nil {

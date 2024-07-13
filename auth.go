@@ -2,13 +2,17 @@ package muzz
 
 import (
 	"errors"
+
 	"github.com/paulmach/orb"
 )
 
 // LoginInput is the accepted request format to log in.
 type LoginInput struct {
-	Email    string
+	// Email of the user record to authenticate.
+	Email string
+	// Password of the user record to authenticate.
 	Password string
+	// Location is the current location of the user to authenticate.
 	Location orb.Point
 }
 

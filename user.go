@@ -2,56 +2,74 @@ package muzz
 
 import (
 	"fmt"
-	"github.com/paulmach/orb"
-	"github.com/pkg/errors"
 	"net/mail"
 	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/paulmach/orb"
+	"github.com/pkg/errors"
 )
 
-// TODO
-//  - Document how we would break app into separate sections as it grows, user section, with user subrouter and handlers, then eventually it's own microservice
-//  - tests at this level
-
-// user field validations
 const (
+	// user field validations.
 	minimumAge            = 18
 	minimumPasswordLength = 8
-	minimumLat            = -90
-	maximumLat            = 90
-	minimumLon            = -180
-	maximumLon            = 180
+
+	// location validations.
+	minimumLat = -90
+	maximumLat = 90
+	minimumLon = -180
+	maximumLon = 180
 )
 
-// User contains all a users stored details.
+// User contains all a user records stored details.
 type User struct {
-	ID       int
-	Email    string
+	// ID is the unique identifier of the user record.
+	ID int
+	// Email of the user record.
+	Email string
+	// Password of the user record.
 	Password string
-	Name     string
-	Gender   Gender
-	Age      int
+	// Name of the user record.
+	Name string
+	// Gender of the user record.
+	Gender Gender
+	// Age of the user record.
+	Age int
+	// Location of the user in longitude and latitude on their last login.
 	Location orb.Point
 }
 
-// UserDetails contains only public user details.
+// UserDetails contains only public user details of a user record.
 type UserDetails struct {
-	ID             int
-	Name           string
-	Gender         Gender
-	Age            int
+	// ID is the unique identifier of the user record.
+	ID int
+	// Name of the user record.
+	Name string
+	// Gender of the user record.
+	Gender Gender
+	// Age of the user record.
+	Age int
+	// DistanceFromMe is the calculated distance from the authenticated user making
+	// the request at the time of the query.
 	DistanceFromMe float64
 }
 
-// CreateUserInput is the accepted request to create a user.
+// CreateUserInput to create a user record.
 type CreateUserInput struct {
-	Email    string
+	// Email address of the user.
+	Email string
+	// Password of the user to authenticate with.
 	Password string
-	Name     string
-	Gender   string
-	Age      int
+	// Name of the user.
+	Name string
+	// Gender of the user.
+	Gender string
+	// Age of the user,
+	Age int
+	// Location of the user in longitude and latitude.
 	Location orb.Point
 }
 
@@ -150,6 +168,13 @@ func (g Gender) Validate() error {
 	return nil
 }
 
+// validatePassword returns an error if the given password does not match the following criteria:
+//   - Contains at least 1 lowercase letter.
+//   - Contains at least 1 uppercase letter.
+//   - Contains at least 1 number.
+//   - Contains at least 1 special character.
+//   - Contains at least minimumPasswordLength characters.
+//   - Contains no spaces.
 func validatePassword(pass string) error {
 	var number, upper, lower, special bool
 	for _, c := range pass {
@@ -187,10 +212,7 @@ func validatePassword(pass string) error {
 }
 
 func validateEmail(email string) error {
-	rgx, err := regexp.Compile(`\s`)
-	if err != nil {
-		return err
-	}
+	rgx := regexp.MustCompile(`\s`)
 	if rgx.MatchString(email) {
 		return errors.New("email cannot contain spaces")
 	}
@@ -222,9 +244,9 @@ func validatePoint(p orb.Point) error {
 type SortType uint8
 
 const (
-	// SortTypeDistance sorts the distance from the authenticated user.
+	// SortTypeDistance sorts user records by the distance from the authenticated user.
 	SortTypeDistance SortType = iota
-	// SortTypeAttractiveness sorts users by how attractive they are according to swipes.
+	// SortTypeAttractiveness sorts user records by how attractive they are according to swipes.
 	SortTypeAttractiveness
 )
 
@@ -265,13 +287,20 @@ func (s SortType) Validate() error {
 	return nil
 }
 
+// GetUsersInput to get a list of user records.
 type GetUsersInput struct {
-	UserID   int
+	// UserID to filter already swiped users from the returned records.
+	UserID int
+	// Location of the authenticated user in longitude and latitude,
+	// used to calculate the user records distance from the authenticated user.
 	Location orb.Point
+	// SortType to sort the user records by.
 	SortType SortType
-	Filters  *UserFilters
+	// Filters to filter the user records by.
+	Filters *UserFilters
 }
 
+// Validate the GetUsersInput fields.
 func (in *GetUsersInput) Validate() error {
 	if in.UserID == 0 {
 		return errors.New("user id is a required field")
@@ -289,12 +318,18 @@ func (in *GetUsersInput) Validate() error {
 	return nil
 }
 
+// UserFilters provided optional fields to filter user records by.
+// Zero values mean no filter should be performed for the respective field.
 type UserFilters struct {
-	MaxAge  int
-	MinAge  int
+	// MaxAge of the user records to return, inclusive.
+	MaxAge int
+	// MinAge of the user records to return, inclusive.
+	MinAge int
+	// Genders of the user records to return, if empty, all genders are returned.
 	Genders []Gender
 }
 
+// Validate the UserFilters fields.
 func (uf *UserFilters) Validate() error {
 	if uf.MaxAge < minimumAge && uf.MaxAge != 0 {
 		return errors.New("max age cannot be less than 18")
@@ -318,6 +353,10 @@ func (uf *UserFilters) Validate() error {
 	return nil
 }
 
+// UserFiltersFromParams takes generic parameter strings from the request URL and attempts to convert
+// them into the correct type for their corresponding UserFilters fields.
+//
+// It DOES NOT validate the values, if you wish to validate them, a call to UserFilters.Validate() should be made.
 func UserFiltersFromParams(maxAge, minAge, genderQueryParam string) (*UserFilters, error) {
 	var (
 		maxAgeInt, minAgeInt int

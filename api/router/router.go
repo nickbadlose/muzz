@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func New(h *handlers.Handlers, cfg *config.Config, au *auth.Authorizer, tp trace.TracerProvider) http.Handler {
+func New(h *handlers.Handlers, cfg *config.Config, au *auth.Authoriser, tp trace.TracerProvider) http.Handler {
 	r := chi.NewRouter()
 
 	// TODO

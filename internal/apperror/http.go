@@ -15,7 +15,7 @@ type HTTPResponse struct {
 }
 
 // Render implements the render.Render interface.
-func (e *HTTPResponse) Render(w http.ResponseWriter, r *http.Request) error {
+func (e *HTTPResponse) Render(_ http.ResponseWriter, r *http.Request) error {
 	render.Status(r, e.Status)
 	return nil
 }

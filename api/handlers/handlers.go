@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"net/http"
+
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/apperror"
@@ -13,36 +16,31 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
-	"net/http"
 )
 
 const (
 	renderingErrorMessage = "rendering error response"
 )
 
-// TODO move handlers to handlers sub package and service to service subpackage. Both can uses types from here, or do
-//  a domain package for types
-//  Have a check for nil items in constructors and log.FatalF if they are nil.
-
-// TODO omitempty MatchID in SwipeResponse
-
-// TODO restrict handlers that need authorizer? Pass in using handler adapter pattern.
-//  No need for service interfaces in here. If the service needs editing,
-//  so does this probably as it will be a business decision
-
+// Config is the interface to retrieve configuration secrets from the environment.
 type Config interface {
+	// DebugEnabled retrieves the debug state of the application.
 	DebugEnabled() bool
 }
 
+// Authorizer is the interface to retrieve an authenticated users ID from.
 type Authorizer interface {
 	// UserFromContext gets the authenticated user from context.
 	UserFromContext(ctx context.Context) (userID int, err error)
 }
 
+// Locationer is the interface to retrieve location information.
 type Locationer interface {
+	// ByIP retrieves a user's IP address.
 	ByIP(ctx context.Context, sourceIP string) (orb.Point, error)
 }
 
+// Handlers holds the HTTP handlers for the valid server endpoints.
 type Handlers struct {
 	config       Config
 	authorizer   Authorizer
@@ -52,6 +50,7 @@ type Handlers struct {
 	matchService *service.MatchService
 }
 
+// New builds a new *Handlers.
 func New(
 	cfg *config.Config,
 	auth Authorizer,
@@ -59,14 +58,37 @@ func New(
 	as *service.AuthService,
 	us *service.UserService,
 	ms *service.MatchService,
-) *Handlers {
-	return &Handlers{cfg, auth, l, as, us, ms}
+) (*Handlers, error) {
+	if cfg == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+	if auth == nil {
+		return nil, errors.New("authorizer cannot be nil")
+	}
+	if l == nil {
+		return nil, errors.New("locationer cannot be nil")
+	}
+	if as == nil {
+		return nil, errors.New("auth service cannot be nil")
+	}
+	if us == nil {
+		return nil, errors.New("user service cannot be nil")
+	}
+	if ms == nil {
+		return nil, errors.New("match service cannot be nil")
+	}
+	return &Handlers{
+		config:       cfg,
+		authorizer:   auth,
+		location:     l,
+		authService:  as,
+		userService:  us,
+		matchService: ms,
+	}, nil
 }
 
-func (h *Handlers) decode() {}
-func (h *Handlers) encode() {}
-
 func encodeResponse[T render.Renderer](w http.ResponseWriter, r *http.Request, debug bool, v T) error {
+	// If debugging, decorate traces with the response data.
 	if debug {
 		span := trace.SpanFromContext(r.Context())
 		buf := &bytes.Buffer{}
@@ -81,8 +103,6 @@ func encodeResponse[T render.Renderer](w http.ResponseWriter, r *http.Request, d
 
 	return render.Render(w, r, v)
 }
-
-// TODO force error and check
 
 func decodeRequest[T any](w http.ResponseWriter, r *http.Request) (T, error) {
 	var v T

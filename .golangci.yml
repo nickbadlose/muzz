@@ -1,0 +1,107 @@
+# See https://golangci-lint.run/usage/linters/#enabled-by-default for a list of available configurations.
+linters-settings:
+  dupl:
+    threshold: 100
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - dupImport
+      - ifElseChain
+      - octalLiteral
+      - wrapperFunc
+      - evalOrder
+  misspell:
+    locale: UK
+  godox:
+    keywords:
+      - FIXME
+      - BUG
+  revive:
+    # https://github.com/mgechev/revive#available-rules
+    enable-all-rules: true
+    rules:
+      - name: add-constant
+        severity: warning
+        disabled: true
+      - name: flag-parameter
+        severity: warning
+        disabled: false
+        exclude: [ "**/handlers.go" ]
+      - name: function-length
+        severity: warning
+        disabled: false
+        arguments: [ 50, 100 ]
+      - name: confusing-naming
+        severity: warning
+        disabled: true
+      - name: cyclomatic
+        severity: warning
+        disabled: false
+        arguments: [ 15 ]
+      - name: cognitive-complexity
+        severity: warning
+        disabled: false
+        arguments: [ 20 ]
+      - name: add-constant
+        severity: warning
+        disabled: false
+        arguments:
+          - maxLitCount: "2"
+            allowStrs: '""'
+            allowInts: "0,1,2"
+      - name: import-alias-naming
+        severity: warning
+        disabled: false
+        arguments:
+          - "^[a-z][-a-z0-9\_]{0,}$"
+      - name: line-length-limit
+        severity: warning
+        disabled: false
+        arguments: [ 125 ]
+      - name: package-comments
+        severity: warning
+        disabled: true
+      - name: unhandled-error
+        severity: warning
+        disabled: false
+        # exclusions
+        arguments:
+          - "fmt.Println"
+          - "fmt.Printf"
+          - "fmt.Print"
+      - name: max-public-structs
+        arguments: [ 10 ]
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - dupl
+    - errcheck
+    - exportloopref
+    - gocritic
+    - gosec
+    - gosimple
+    - govet
+    - godot
+    - gofmt
+    - ineffassign
+    - importas
+    - misspell
+    - protogetter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - typecheck
+    - unparam
+    - unused
+    - whitespace
+    - godox
+run:
+  tests: false
+  concurrency: 4
+  issues-exit-code: 1
