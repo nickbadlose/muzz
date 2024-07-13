@@ -1,11 +1,9 @@
 package tracer
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/nickbadlose/muzz/internal/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/jaeger"
@@ -13,7 +11,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
-	"go.uber.org/zap"
 )
 
 // Config is the interface to retrieve configuration secrets from the environment.
@@ -25,14 +22,7 @@ type Config interface {
 }
 
 // New configures the global OpenTelemetry tracer and returns an error if it fails.
-func New(ctx context.Context, cfg Config, serviceName string) (*tracesdk.TracerProvider, error) {
-	logger.Debug(
-		ctx,
-		"setting up Jaeger tracer",
-		zap.String("host", cfg.JaegerHost()),
-		zap.String("env", cfg.Env()),
-	)
-
+func New(cfg Config, serviceName string) (*tracesdk.TracerProvider, error) {
 	exp, err := jaeger.New(
 		jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(fmt.Sprintf("http://%s/api/traces", cfg.JaegerHost()))),
 	)

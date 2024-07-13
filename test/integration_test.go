@@ -83,10 +83,12 @@ func newTestServer(t *testing.T) *httptest.Server {
 	hlr, err := handlers.New(cfg, authorizer, &mockLocation{}, authService, userService, matchService)
 	require.NoError(t, err)
 
-	tp, err := tracer.New(context.Background(), cfg, "muzz")
+	tp, err := tracer.New(cfg, "muzz")
 	require.NoError(t, err)
 
-	srv := httptest.NewServer(router.New(hlr, cfg, authorizer, tp))
+	router, err := router.New(cfg, hlr, authorizer, tp)
+	require.NoError(t, err)
+	srv := httptest.NewServer(router)
 	t.Cleanup(srv.Close)
 
 	return srv

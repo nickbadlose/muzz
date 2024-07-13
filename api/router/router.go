@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/nickbadlose/muzz/internal/tracer"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -10,11 +10,31 @@ import (
 	"github.com/nickbadlose/muzz/api/handlers"
 	"github.com/nickbadlose/muzz/config"
 	"github.com/nickbadlose/muzz/internal/auth"
+	"github.com/nickbadlose/muzz/internal/tracer"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func New(h *handlers.Handlers, cfg *config.Config, au *auth.Authoriser, tp trace.TracerProvider) http.Handler {
+// New builds a new http.Handler.
+func New(
+	cfg *config.Config,
+	h *handlers.Handlers,
+	au *auth.Authoriser,
+	tp trace.TracerProvider,
+) (http.Handler, error) {
+	if cfg == nil {
+		return nil, errors.New("config cannot be nil")
+	}
+	if h == nil {
+		return nil, errors.New("handlers cannot be nil")
+	}
+	if au == nil {
+		return nil, errors.New("authoriser cannot be nil")
+	}
+	if tp == nil {
+		return nil, errors.New("tracer provider cannot be nil")
+	}
+
 	r := chi.NewRouter()
 
 	// TODO
@@ -36,22 +56,8 @@ func New(h *handlers.Handlers, cfg *config.Config, au *auth.Authoriser, tp trace
 		r.Use(tracer.HTTPDebugMiddleware(tp))
 	}
 
-	// Public routes
-	r.Group(func(r chi.Router) {
-		r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			render.JSON(w, r, map[string]string{"status": "ok"})
-		})
-		r.Post("/user/create", h.CreateUser)
-		r.Post("/login", h.Login)
-	})
+	addPublicRoutes(r, h)
+	addPrivateRoutes(r, h, au)
 
-	// Private routes
-	r.Group(func(r chi.Router) {
-		r.Use(auth.NewHTTPMiddleware(au))
-		r.Get("/discover", h.Discover)
-		r.Post("/swipe", h.Swipe)
-	})
-
-	return otelhttp.NewHandler(r, "router")
+	return otelhttp.NewHandler(r, "router"), nil
 }

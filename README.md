@@ -35,15 +35,14 @@ Muzz tech test
 
 ## Linting
 
-To run the linter, you need to install [golangci-lint](https://golangci-lint.run/welcome/install/#local-installation).
+We use `golangci-lint` for linting, to install, go to [golangci-lint](https://golangci-lint.run/welcome/install/#local-installation).
 
 To run the linter, run:
-
 ```bash
 golangci-lint run 
 ```
 
-Linter configurations can be edited to suit desired project needs in `.golangci.yml`. See [here](https://golangci-lint.run/usage/configuration) 
+Linter configurations can be edited to suit the desired project needs in `.golangci.yml`. See [here](https://golangci-lint.run/usage/configuration) 
 for available configurations.
 
 ## Database Package

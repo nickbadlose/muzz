@@ -27,15 +27,11 @@ linters-settings:
     rules:
       - name: add-constant
         severity: warning
-        disabled: true
-      - name: flag-parameter
-        severity: warning
         disabled: false
-        exclude: [ "**/handlers.go" ]
-      - name: function-length
-        severity: warning
-        disabled: false
-        arguments: [ 50, 100 ]
+        arguments:
+          - maxLitCount: "5"
+            allowStrs: '""'
+            allowInts: "0,1,2"
       - name: confusing-naming
         severity: warning
         disabled: true
@@ -47,13 +43,18 @@ linters-settings:
         severity: warning
         disabled: false
         arguments: [ 20 ]
-      - name: add-constant
+      - name: deep-exit
         severity: warning
         disabled: false
-        arguments:
-          - maxLitCount: "2"
-            allowStrs: '""'
-            allowInts: "0,1,2"
+        exclude: [ "**/config/config.go" ]
+      - name: flag-parameter
+        severity: warning
+        disabled: false
+        exclude: [ "**/handlers.go" ]
+      - name: function-length
+        severity: warning
+        disabled: false
+        arguments: [ 50, 100 ]
       - name: import-alias-naming
         severity: warning
         disabled: false

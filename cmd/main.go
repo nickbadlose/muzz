@@ -2,40 +2,31 @@ package main
 
 import (
 	"context"
+	"github.com/nickbadlose/muzz/api"
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/nickbadlose/muzz/api/handlers"
-	"github.com/nickbadlose/muzz/api/router"
 	"github.com/nickbadlose/muzz/config"
-	"github.com/nickbadlose/muzz/internal/auth"
 	internalcache "github.com/nickbadlose/muzz/internal/cache"
 	"github.com/nickbadlose/muzz/internal/database"
-	"github.com/nickbadlose/muzz/internal/database/adapter/postgres"
-	"github.com/nickbadlose/muzz/internal/location"
 	"github.com/nickbadlose/muzz/internal/logger"
-	"github.com/nickbadlose/muzz/internal/service"
 	"github.com/nickbadlose/muzz/internal/tracer"
 )
 
 const (
 	// the timeout for the server to be idle before forcing a shutdown whilst attempting a graceful shutdown.
-	idleTimeout = 30 * time.Second
+	idleTimeout     = 30 * time.Second
+	applicationName = "muzz"
 )
 
-// TODO
-//  NewServer func which constructs server and abstracts it from here
-//  integration tests will need current setup due to location mocking
-//  Build cache, logger and db etc in here and pass into new server func which builds the rest from them
-
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background()
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
 	cfg := config.MustLoad()
 
@@ -44,10 +35,7 @@ func main() {
 		log.Fatalf("failed to initialise logger: %s", err)
 	}
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
-	tp, err := tracer.New(ctx, cfg, "muzz")
+	tp, err := tracer.New(cfg, applicationName)
 	if err != nil {
 		log.Fatalf("failed to initialise tracer: %s", err)
 	}
@@ -80,74 +68,36 @@ func main() {
 		log.Fatalf("failed to initialise cache: %s", err)
 	}
 
-	matchAdapter, err := postgres.NewMatchAdapter(db)
+	srv, err := api.NewServer(cfg, db, cache, tp)
 	if err != nil {
-		log.Fatalf("failed to initialise match adapter: %s", err)
-	}
-	userAdapter, err := postgres.NewUserAdapter(db)
-	if err != nil {
-		log.Fatalf("failed to initialise user adapter: %s", err)
-	}
-
-	authorizer, err := auth.NewAuthoriser(cfg, userAdapter)
-	if err != nil {
-		log.Fatalf("failed to initialise authorizer: %s", err)
-	}
-	loc, err := location.New(cfg, cache)
-	if err != nil {
-		log.Fatalf("failed to initialise location: %s", err)
-	}
-
-	authService, err := service.NewAuthService(authorizer, userAdapter)
-	if err != nil {
-		log.Fatalf("failed to initialise auth service: %s", err)
-	}
-	matchService, err := service.NewMatchService(matchAdapter)
-	if err != nil {
-		log.Fatalf("failed to initialise match service: %s", err)
-	}
-	userService, err := service.NewUserService(userAdapter)
-	if err != nil {
-		log.Fatalf("failed to initialise user service: %s", err)
-	}
-
-	hlr, err := handlers.New(cfg, authorizer, loc, authService, userService, matchService)
-	if err != nil {
-		log.Fatalf("failed to initialise handlers: %s", err)
-	}
-
-	// TODO server configuration
-	server := &http.Server{
-		Handler: router.New(hlr, cfg, authorizer, tp),
-		Addr:    cfg.Port(),
+		log.Fatalf("failed to initialise server: %s", err)
 	}
 
 	go func() {
 		log.Printf("listening on port: %v\n", cfg.Port())
-		sErr := server.ListenAndServe()
+		sErr := srv.ListenAndServe()
 		if sErr != nil {
-			log.Fatalf("starting server: %s", sErr)
+			logger.Error(ctx, "starting server", sErr)
 		}
 	}()
 
 	<-sig
-	timeoutCtx, timeoutCancel := context.WithTimeout(ctx, idleTimeout)
-	defer timeoutCancel()
-	// TODO close all service connections after graceful shutdown, logger last
-	err = server.Shutdown(timeoutCtx)
+	ctx, cancel := context.WithTimeout(ctx, idleTimeout)
+	defer cancel()
+	err = srv.Shutdown(ctx)
 	if err != nil {
-		log.Fatalf("shutting down server: %s", err)
+		logger.Error(ctx, "shutting down server", err)
 	}
 	err = cache.Close()
 	if err != nil {
-		log.Fatalf("closing cache: %s", err)
+		logger.Error(ctx, "closing cache", err)
 	}
 	err = db.Close()
 	if err != nil {
-		log.Fatalf("closing database: %s", err)
+		logger.Error(ctx, "closing database", err)
 	}
 	err = logger.Close()
 	if err != nil {
-		log.Fatalf("closing logger: %s", err)
+		log.Printf("closing logger: %s\n", err)
 	}
 }
