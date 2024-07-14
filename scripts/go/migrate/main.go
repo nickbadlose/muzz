@@ -54,7 +54,7 @@ func main() {
 
 	if seed != nil && *seed {
 		migrations = append(migrations, &migration{
-			source:          "./scripts/go/migrations/seed_test_data",
+			source:          "./scripts/go/migrate/migrations/seed_test_data",
 			migrationsTable: fmt.Sprintf("schema_migrations_%s", "seed_test_data"),
 			message:         "seeding test data",
 		})

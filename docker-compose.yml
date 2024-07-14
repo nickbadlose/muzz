@@ -6,11 +6,22 @@ services:
     profiles: ["api"]
     restart: always
     environment:
-      PORT: ${PORT}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      PORT: ${PORT:-3000}
       DATABASE_USER: ${DATABASE_USER}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       DATABASE_HOST: ${DATABASE_HOST}
       DATABASE: ${DATABASE}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DOMAIN_NAME: ${DOMAIN_NAME}
+      JWT_DURATION: ${JWT_DURATION}
+      JWT_SECRET: ${JWT_SECRET}
+      GEOIP_API_KEY: ${GEOIP_API_KEY}
+      GEOIP_ENDPOINT: ${GEOIP_ENDPOINT}
+      CACHE_PASSWORD: ${CACHE_PASSWORD}
+      CACHE_HOST: ${CACHE_HOST}
+      JAEGER_HOST: ${JAEGER_HOST}
+      DEBUG_ENABLED: ${DEBUG_ENABLED:-false}
     build:
       target: development
       context: .
@@ -21,6 +32,8 @@ services:
       - "3000:3000"
     links:
       - db
+      - redis
+      - jaeger
     networks:
       - api
 
