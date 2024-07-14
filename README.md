@@ -32,6 +32,10 @@ Muzz tech test
 - Use context signal to close deps in main?
 - Have test.env file for integration tests, run docker up with that env file in make file for tests, set env to test 
   in tests. But use development, use maybe config_test for testing config, try and have config test file in config dir.
+- try test main func or at least setup less in integration tests
+- search fmt.Println and log and clear them if not for production
+- State returning a user password is bad.
+
 
 ## Postman
 
@@ -46,7 +50,7 @@ To run the linter, run:
 golangci-lint run 
 ```
 
-Linter configurations can be edited to suit the desired project needs in `.golangci.yml`. See [here](https://golangci-lint.run/usage/configuration) 
+Linter configurations can be edited to suit the desired project needs in `.golangci.yml`. See [the docs](https://golangci-lint.run/usage/configuration) 
 for available configurations.
 
 ## Database Package
@@ -149,7 +153,7 @@ Whilst fine for tests, this doesn't look viable for production code, as I think 
 per user row returned, so I will investigate the performance of the queries by seeding test data and analysing the 
 queries. [This legend](https://gis.stackexchange.com/a/247131) has provided me with a formula to seed random locations 
 across the world, the only other real issue was avoiding unique constraints in the swipe table. See the seeding test 
-migrations file [here](./scripts/go/migrations/seed_test_data/1_seed_random_data.up.sql).
+migrations file [here](scripts/go/migrate/migrations/seed_test_data/1_seed_random_data.up.sql).
 
 Let's seed 10000 dummy users with swipe data and run the query to see if any performance optimisation is needed at all, 
 before prematurely optimising:
@@ -293,12 +297,14 @@ I've also added a LIMIT of 50 despite not being in the specs, since returning al
 the discover endpoint is that pagination isn't necessary since we exclude swiped users, it basically self paginates if 
 you simply add a limit. In reality, this limit would be client provided.
 
-**NOTE** - if you wish to test queries with more users, you can edit this [file](./scripts/go/migrations/seed_test_data/1_seed_random_data.up.sql)
+> **NOTE** - if you wish to test queries with more users, you can edit this [file](scripts/go/migrate/migrations/seed_test_data/1_seed_random_data.up.sql)
 to use another number instead of the 10000 users we are using for analysis, the golang-migrate library we are using for
 migrations doesn't support query parameters, so you will need to manually edit it.
 
 A gotcha for analysing the queries is data is cached for subsequent runs, so we need to reset and re-seed the entire
 database before each `EXPLAIN ANALYSE`.
+
+TODO link migrate readme.
 
 To do this, run:
 ```bash

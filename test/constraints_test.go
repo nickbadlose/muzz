@@ -1,17 +1,19 @@
 package test
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/nickbadlose/muzz/config"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConstraints(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping integration testing in short mode")
+	}
+
 	cases := []struct {
 		name       string
 		errMessage string
@@ -38,79 +40,26 @@ func TestConstraints(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
+	for i, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg, err := config.Load()
-			require.NoError(t, err)
-			// TODO don't continue on errorNoChange, it means some migrations haven't run correctly?
-			//  make boilerplate code reusable between tests
+			t.Parallel()
 
-			// create test DB migrator to set up and teardown test db.
-			// You can't drop a database whilst connections still exist, so we authenticate to the postgres DB to run these.
-			createTestDBMigrator, err := migrate.New(
-				"file://./migrations/create",
-				fmt.Sprintf(
-					"postgres://%s:%s@%s/postgres?sslmode=disable",
-					cfg.DatabaseUser(),
-					cfg.DatabasePassword(),
-					cfg.DatabaseHost(),
-				),
-			)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				err = createTestDBMigrator.Down()
-				if !errors.Is(err, migrate.ErrNoChange) {
-					require.NoError(t, err)
-				}
-				sErr, dErr := createTestDBMigrator.Close()
-				require.NoError(t, sErr)
-				require.NoError(t, dErr)
-			})
+			testDBName := fmt.Sprintf("test_%d_constraints", i)
 
-			err = createTestDBMigrator.Up()
-			if !errors.Is(err, migrate.ErrNoChange) {
-				require.NoError(t, err)
-			}
+			setupDB(t, cfg, testDBName)
 
-			// TODO run appMigrator.Drop at the start of each migration to clear all data if db already existed
-			// app migrator to run all application migrations.
-			appMigrator, err := migrate.New(
-				"file://../migrations",
-				fmt.Sprintf(
-					"postgres://%s:%s@%s/test?sslmode=disable",
-					cfg.DatabaseUser(),
-					cfg.DatabasePassword(),
-					cfg.DatabaseHost(),
-				),
-			)
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				err = appMigrator.Down()
-				require.NoError(t, err)
-				sErr, dErr := appMigrator.Close()
-				require.NoError(t, sErr)
-				require.NoError(t, dErr)
-			})
-
-			err = appMigrator.Up()
-			if !errors.Is(err, migrate.ErrNoChange) {
-				require.NoError(t, err)
-			}
-
-			// seed migrator seeds any test data into the database. Golang-migrate requires multiple schema tables to run
-			// multiple separate migration folders against the same DB, so we specify a seed schema table for these,
-			// &x-migrations-table=\"schema_seed_migrations\".
-			// https://github.com/golang-migrate/migrate/issues/395#issuecomment-867133636
+			// trigger constraint errors
 			constraintMigrator, err := migrate.New(
 				fmt.Sprintf(
 					"file://./migrations/constraints/%s",
 					strings.ReplaceAll(tc.name, " ", "_"),
 				),
 				fmt.Sprintf(
-					"postgres://%s:%s@%s/test?sslmode=disable&x-migrations-table=schema_constraint_migrations",
+					"postgres://%s:%s@%s/%s?sslmode=disable&x-migrations-table=schema_constraint_migrations",
 					cfg.DatabaseUser(),
 					cfg.DatabasePassword(),
 					cfg.DatabaseHost(),
+					testDBName,
 				),
 			)
 			require.NoError(t, err)

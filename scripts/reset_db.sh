@@ -20,4 +20,4 @@ else
   echo "---                    ---"
 fi;
 
-go run "$SCRIPT_DIR/go/migrate.go" --seed="$seed"
+go run "$SCRIPT_DIR/go/migrate/main.go" --seed="$seed"

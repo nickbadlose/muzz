@@ -18,7 +18,8 @@ import (
 const (
 	driverName = "postgres"
 
-	defaultTimeout = 10 * time.Second
+	// timeout to establish a connection with the database before killing the script.
+	timeout = 10 * time.Second
 )
 
 var (
@@ -68,9 +69,9 @@ func main() {
 		*db,
 	)
 
-	err := confirmDatabaseConnection(dsn)
-	if err != nil {
-		log.Fatal(err)
+	connErr := confirmDatabaseConnection(dsn)
+	if connErr != nil {
+		log.Fatal(connErr)
 	}
 
 	for _, mig := range migrations {
@@ -133,7 +134,7 @@ func confirmDatabaseConnection(dsn string) error {
 	}()
 
 	select {
-	case <-time.After(defaultTimeout):
+	case <-time.After(timeout):
 		return errors.New("timed out whilst waiting for database to accept connections")
 	case err := <-errored:
 		return err

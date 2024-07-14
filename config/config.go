@@ -136,6 +136,10 @@ func MustLoad() *Config {
 // Load the environment into the viper package and returns a new Config service to retrieve env vars. The env is
 // configured from a root level "<environment>.env" file and then overwriting with set environment variables.
 func Load() (*Config, error) {
+
+	// TODO pass in paths ...string param, which adds config paths to search for env file.
+	//  This way we can keep env files in related packages
+
 	env := getEnv()
 	viper.AutomaticEnv()
 

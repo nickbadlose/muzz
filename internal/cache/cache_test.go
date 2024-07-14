@@ -23,6 +23,10 @@ func setupCache(t *testing.T) (*Cache, *miniredis.Miniredis, func()) {
 }
 
 func TestNew(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping cache testing in short mode")
+	}
+
 	t.Run("it should create a new cache without errors, configured correctly", func(t *testing.T) {
 		srv := miniredis.RunT(t)
 		cache, err := New(context.TODO(), &Credentials{Host: srv.Addr()})
@@ -67,6 +71,10 @@ func TestNew(t *testing.T) {
 }
 
 func TestCacheGet(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping cache testing in short mode")
+	}
+
 	cache, srv, cleanup := setupCache(t)
 	t.Cleanup(cleanup)
 
@@ -107,6 +115,10 @@ func TestCacheGet(t *testing.T) {
 }
 
 func TestCacheSetEx(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping cache testing in short mode")
+	}
+
 	cache, srv, cleanup := setupCache(t)
 	t.Cleanup(cleanup)
 
