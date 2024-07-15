@@ -9,13 +9,13 @@ import (
 )
 
 func TestConfig_success(t *testing.T) {
-	err := os.Setenv("ENVIRONMENT", "test")
+	err := os.Setenv("ENVIRONMENT", "test_config")
 	require.NoError(t, err)
 
 	cfg, err := Load()
 	require.NoError(t, err)
 
-	require.Equal(t, "test", cfg.Env())
+	require.Equal(t, "test_config", cfg.Env())
 	require.Equal(t, ":3000", cfg.Port())
 	require.Equal(t, "test_database_user", cfg.DatabaseUser())
 	require.Equal(t, "test_database_password", cfg.DatabasePassword())

@@ -23,9 +23,9 @@ const (
 )
 
 var (
-	db            = flag.String("db", "", "database to run migrations against")
+	db            = flag.String("db", "", "database to run migrations against.")
 	migrationPath = flag.String("migration-path", "./migrations", "location of the migrations folder to run.")
-	seed          = flag.Bool("seed", false, "whether to seed the db with dummy data for testing")
+	seed          = flag.Bool("seed", false, "whether to seed the db with dummy data for testing.")
 )
 
 type (

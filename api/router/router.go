@@ -37,16 +37,10 @@ func New(
 
 	r := chi.NewRouter()
 
-	// TODO
-	//  - context middleware
-	//  - 405/404 middleware
-	//  - add request id / trace id
-	//  - use timestamps for migrations
-
 	r.Use(
 		middleware.AllowContentType("application/json"),
 		middleware.RealIP,
-		middleware.Logger, // TODO custom logger?
+		middleware.Logger,
 		middleware.Recoverer,
 		render.SetContentType(render.ContentTypeJSON),
 		tracer.HTTPResponseHeaders,

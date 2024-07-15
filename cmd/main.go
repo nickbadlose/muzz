@@ -84,9 +84,6 @@ func main() {
 
 	<-sig
 
-	// TODO Have sig creation and handling in go routine in api.NewServer?
-	//  listen for ctx.Done in here and when hit, close deps??
-
 	ctx, cancel := context.WithTimeout(ctx, idleTimeout)
 	defer cancel()
 	err = srv.Shutdown(ctx)

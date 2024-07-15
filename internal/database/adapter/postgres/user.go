@@ -265,9 +265,9 @@ func applyUserFilters(in *muzz.UserFilters, selector db.Selector) db.Selector {
 	}
 
 	if len(in.Genders) != 0 {
-		genderStrings := make([]string, len(in.Genders))
-		for i, gen := range in.Genders {
-			genderStrings[i] = gen.String()
+		genderStrings := make([]string, 0, len(in.Genders))
+		for _, gen := range in.Genders {
+			genderStrings = append(genderStrings, gen.String())
 		}
 		selector = selector.And("u.gender IN ", genderStrings)
 	}

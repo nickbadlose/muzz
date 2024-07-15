@@ -380,9 +380,9 @@ func UserFiltersFromParams(maxAge, minAge, genderQueryParam string) (*UserFilter
 
 	if genderQueryParam != "" {
 		genderStrings := strings.Split(genderQueryParam, ",")
-		genders = make([]Gender, len(genderStrings))
-		for i, g := range genderStrings {
-			genders[i] = GenderValues[g]
+		genders = make([]Gender, 0, len(genderStrings))
+		for _, g := range genderStrings {
+			genders = append(genders, GenderValues[g])
 		}
 	}
 

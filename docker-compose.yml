@@ -6,13 +6,13 @@ services:
     profiles: ["api"]
     restart: always
     environment:
-      ENVIRONMENT: ${ENVIRONMENT:-development}
-      PORT: ${PORT:-3000}
+      ENVIRONMENT: ${ENVIRONMENT}
+      PORT: ${PORT}
       DATABASE_USER: ${DATABASE_USER}
       DATABASE_PASSWORD: ${DATABASE_PASSWORD}
       DATABASE_HOST: ${DATABASE_HOST}
       DATABASE: ${DATABASE}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_LEVEL: ${LOG_LEVEL}
       DOMAIN_NAME: ${DOMAIN_NAME}
       JWT_DURATION: ${JWT_DURATION}
       JWT_SECRET: ${JWT_SECRET}
@@ -21,7 +21,7 @@ services:
       CACHE_PASSWORD: ${CACHE_PASSWORD}
       CACHE_HOST: ${CACHE_HOST}
       JAEGER_HOST: ${JAEGER_HOST}
-      DEBUG_ENABLED: ${DEBUG_ENABLED:-false}
+      DEBUG_ENABLED: ${DEBUG_ENABLED}
     build:
       target: development
       context: .
@@ -32,13 +32,13 @@ services:
       - "3000:3000"
     links:
       - db
-      - redis
-      - jaeger
+      - cache
+      - tracing
     networks:
       - api
 
   db:
-    container_name: postgres
+    container_name: postgis
     image: postgis/postgis:16-3.4
     platform: linux/amd64
     restart: always
@@ -46,7 +46,6 @@ services:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
       POSTGRES_DB: ${DATABASE}
-#      TODO add all env vars into here
     volumes:
       - source: database
         target: /var/lib/postgresql/data
@@ -56,7 +55,7 @@ services:
     networks:
       - api
 
-  redis:
+  cache:
     container_name: redis
     image: redis:7.2.5
     restart: always
@@ -68,7 +67,7 @@ services:
       - api
     entrypoint: redis-server --appendonly yes --requirepass ${CACHE_PASSWORD}
 
-  jaeger:
+  tracing:
     container_name: jaeger
     image: "jaegertracing/all-in-one:latest"
     restart: always

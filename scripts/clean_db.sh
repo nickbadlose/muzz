@@ -6,9 +6,9 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 seed="${1:-false}"
 
-docker compose down
+docker compose down db
 docker volume rm muzz_database
-docker compose --env-file development.env up -d
+docker compose --env-file config/default.env up -d db
 
 if $seed; then
   echo "---                                 ---"

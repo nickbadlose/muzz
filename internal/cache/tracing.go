@@ -51,6 +51,7 @@ func setTraceAttributes(span trace.Span, args []any) {
 				fmt.Sprintf("%s.%d", redisArgs, i),
 				time.Duration(t),
 			))
+			continue
 		}
 		span.SetAttributes(tracer.Attribute(
 			fmt.Sprintf("%s.%d", redisArgs, i),

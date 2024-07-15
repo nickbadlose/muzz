@@ -1,66 +1,22 @@
-# muzz
-Muzz tech test
+# Muzz Tech Test
 
-Add list of links to sections of the README
 
-scripts section
-tests
+- [Running the Application](#running-the-application)
+- [Testing the Application](#testing-the-application)
+- [Endpoints](#endpoints)
+- [Config](#config)
+- [Application Architecture](#application-architecture)
+- [Code Architecture](#code-architecture)
+- [Internal Packages](#internal-packages)
+- [Discover Query](#discover-query)
+- [Location Data](#location-data)
+- [Scripts](#scripts)
+- [Linting](#linting)
 
 ## TODO
-- makefile for docker up / restart db and clear data. Migrations should be run in these too
-- Postgis vs mysql https://stackoverflow.com/a/22576304/22675476
-- Using geography type https://postgis.net/docs/manual-3.4/using_postgis_dbmanagement.html#PostGIS_GeographyVSGeometry
-- Postgis over posrtgres as global distances are curved and not plane. Postgis handles these calculations
-- https://postgis.net/docs/using_postgis_dbmanagement.html#Create_Geography_Tables
-- Get long/lat on FE vs BE:
-  - FE will only have to get once and can send on all subsequent queries. BE will need to get from IP on each request, can cache but still not ideal.
-  - State in README that I would probably discuss with peers to make decision on where I get it
-- GitHub actions with tests and push to dockerhub / ecr if available
-- https://postgis.net/workshops/postgis-intro/
-- Looks like IP is coming from ISP, may be better to just pass it in, in general, and use IP of request as backup?
-- add limit, no need for pagination as we exclude swiped users so will always want the first x amount.
-- List of tools
-- postgis gis index for distance calculations, see docs
-- Think of edge cases for discover query, if any exist
-- Added a limit as responses for many users were too large
-- State validations are business logic.
-- TODO docs for generating mocks
-- Document how we would break app into separate sections as it grows, user section, with user subrouter and handlers, then eventually it's own microservice
-- Do some sort of docs, if README or swagger or something else
-- Test New funcs throughout
-- Check the specs before sending.
-- Make sure we can set up from scratch and run using docker only, not goland.
-- Check all make functions and use correct methods ie len or cap with append or [i]
-- Use sql for transactions for match records, delete on cascade for user records and related data, even other users data such as swipes and matches.
-- Document providing IP in postman and manually providing for create user, so they don't all use your IP address.
-- Makefile for tests and dev ??
-- Use context signal to close deps in main?
-- Have test.env file for integration tests, run docker up with that env file in make file for tests, set env to test 
-  in tests. But use development, use maybe config_test for testing config, try and have config test file in config dir.
-- try test main func or at least setup less in integration tests
-- search fmt.Println and log and clear them if not for production
-- State returning a user password is bad.
-- Docs for generating mocks
 - Adminer and redis commander https://hub.docker.com/r/rediscommander/redis-commander?
-- Run linter
-- state in README how unit testing is much easier with adapter pattern. We can use complicated sql mock on just repository methods and mock repositories for unit tests of service.
-- package level docs - doc.go
 
-TODO docker compose down to renew env vars? using correct env file
-Try running with dev env with different credentials and then running this to see if the containers reset.
-If not, see if there is a way to restart containers to redo env vars only. Check if volumes need to be cleared
-See if it is possible to pass all env vars from a .env file to a specific container with a flag? So API container
-doesn't have to specify specific env vars
-
-## Running the application
-
-TODO with and without API profile
-
-Give execution permissions:
-
-```bash
-chmod +x ./scripts/run.sh 
-```
+## Running the Application
 
 Then to start the application, run:
 
@@ -68,19 +24,51 @@ Then to start the application, run:
 ./scripts/run.sh 
 ```
 
-docker run with API enabled and link to postman collection to run requests
+You should now be able to head to [endpoints section](#endpoints) and make some requests.
 
-#### Debugging
+#### Local and Debugging
 
-docker run without api profile and with DEBUG_ENABLED
+To run the app locally, run:
 
-## Testing the application
+```bash
+./scripts/run_dev.sh 
+```
 
-#### Integration tests
+And then run the api locally using whichever IDE you prefer. This allows you to use the debugger to add break points 
+etc. since this is a hassle in a container.
 
-#### Unit tests
+## Testing the Application
 
-run with `-short` flag to run unit tests only, 
+Before running integration tests, we must set up our dev environment by running:
+
+```bash
+./scripts/run_dev.sh
+```
+
+To run the whole test suite, we can run:
+
+```bash
+go test ./... -count=1
+```
+
+#### Integration Tests
+
+See our integration tests [README](test/README.md) for more information.
+
+#### Unit Tests
+
+To run unit tests only, run with the `-short` flag.
+
+```bash
+go test ./... -count=1 -short 
+```
+
+#### Generating Mocks
+
+We use [mockery](https://github.com/vektra/mockery) for generating our mock interfaces and run them as part of our 
+`go generate./...` command. It gives us a clear and explicit way of writing expectation from dependencies in unit 
+tests. See `internal/service/` tests for an example of using this, `gen.go` contains the generation logic and the 
+`/mocks` package holds the mock interfaces.
 
 ## Endpoints
 
@@ -95,7 +83,8 @@ with the list of available endpoints configured.
 call to `/login` will set this value for other requests.
 
 *true_client_ip* - is the IP address of the client making the request, postman doesn't attach one, so we have to 
-manually populate this value when making requests through postman.
+manually populate this value when making requests through postman. Edit this value if you wish to change the location 
+of the authenticated user when making discover requests. 
 
 You can edit these as necessary.
 
@@ -222,7 +211,19 @@ example response:
 }
 ```
 
-## Application architecture
+## Config
+
+Usually I would not push an env file to version control, however for this project it makes some sense, given it isn't 
+a production project and will stop me having to provide env vars.
+
+If you wish to edit any env vars, go to the `config/default.env` and edit them accordingly in there. This env file is 
+used as the source of our docker containers environment variables.
+
+> **NOTE** If we change the database or cache credentials in the default.env file after a docker volume has been 
+> created, restarting the containers will update the env vars, but not the auth. You will need to clear the volumes 
+> to do this by running `./scripts/clear_data.sh`. Then you should be good to go.
+
+## Application Architecture
 
 Monolith architecture currently, whilst microservices bring a lot of benefits, they also bring a lot of initial 
 overhead, slowing development speed and increasing complexity. There is no need to add this complexity from the get go, 
@@ -232,7 +233,7 @@ Code should be structured with scalability in mind, so when we grow as a company
 scalable architectures such as microservice with minimal impact, there should be clear boundaries for us to build our 
 services from. We could easily isolate all user logic into a single microservice for example.
 
-#### Database choice
+#### Database Choice
 
 For storing the main data, the initial thought process is SQL vs NoSQL, the specs provided have stated 3 clear domain 
 entities, Users, Swipes and Matches. Where swipes and matches both relate to the user. So the schema is almost laid 
@@ -246,41 +247,38 @@ particularly elasticsearch is great for these types of searches, whereas SQL per
 these. So another reason not to use NoSQL right at this point in time. 
 
 There are no payment items currently, but if we wish to monetize the app, we will want SQL databases to utilise 
-the data integrity and consistency provided by transactions.
+the data integrity and consistency provided by transactions. So for now, even though there is an argument for 
+availability over consistency, it seems a safe bet to use SQL over NoSQL. 
 
-So for now, it seems a safe bet to use SQL over NoSQL. I have decided to use PostgreSQL, as it offers
-
-TODO why we chose postgres and postgis
+I have decided to use PostgreSQL, as it offers all the functionality we need, the PostGis extension offers 
+excellent geospatial querying and since we will be doing a lot of both read and write operations, Postgres handles both
+of these well with good performance.
 
 #### Caching
 
+For caching we use redis, it's superfast and is ideal for use as an in memory cache. Allowing us to speed up any time 
+heavy processes, such as requests to external services like the location IP service.
 
-## Code architecture
+## Code Architecture
 
 Monorepo with a layered design, domain logic at the top level (`muzz` package), interface logic in `api` package, 
-service logic in `internal/service` and database logic in `internal/database/...` etc. 
-
+service logic in `internal/service` and database logic in `internal/database/...` etc.
 
 **Dependency inversion and the adapter pattern:**
 
-A good example of this is the io.Reader interface. Using an adapter pattern, we can isolate the code dependency of a 
-particular database provider to a single package. For example if we were to switch from Postgres to a nosql database 
-such as mongodb, we would just write an adapter for mongodb to meet the repository interfaces expected by the internal 
-`service` package and pass it in the `main` function. The service, interface and domain layers would be unaware of any 
-changes. 
+A good example of this is the io.Reader interface. The dependant package specifies the interface it requires. For 
+example, our `internal/service` service structs define the repository interfaces they need to use for storing data. 
+This allows us to:
 
-Similarly, if we decided to switch our interface to a gRPC server instead of HTTP, only the API package would be aware 
-of the change and our other layers would not need any editing. 
+- Completely rewrite one layer of the application with zero impact in any other layers. (we could switch to MongoDB 
+  and only the code in the `internal/database` package would change. The service, interface and domain layers would 
+  be unaware.)
+- Unit testing is extremely easy to do thoroughly, we can mock our interfaces using the `go generate ./...` command
+  and isolate unit tests to the current layer only. 
+- It boosts maintainability, readability and development speed, especially in the long run by setting up our code like 
+  this.
 
-This boosts maintainability, readability and development speed, especially in the long run by setting up our code like 
-this. It offers a clear and transparent guideline and structure for any other users coming in to add features for the 
-first time.
-
-## Tracing
-
-TODO debug mode etc.
-
-## Internal packages
+## Internal Packages
 
 I generally create packages for reusable code, such as database, cache and logger logic. Even though the packages are 
 only really being used in the two places right now (monolith), main and integrations tests. We may need to use them 
@@ -302,13 +300,35 @@ Some packages are not necessarily reusable but are useful for structure and abst
 into one place, such as the auth and location packages. This removes clutter from the main application and makes code 
 more readable.
 
-#### Database Package
+#### Tracer
+
+We use jaeger for tracing, to view your traces, run the app, make a request and go to http://localhost:16686/search and
+click `Find Traces`. You can see the all the traced steps of the request.
+
+When `DEBUG_ENABLED` is set to true, all request and response information at the boundary of each layer is traced,
+with arguments and parameters also. This obviously shouldn't be set to true for production, however for local
+development and tests servers, it can be extremely useful for debugging. Especially when using microservices.
+
+Try making a request with `DEBUG_ENABLED` set to both true and false and see the difference in the tags on the given
+spans. If you make a `/login` request the following queries will have valuable tags on them:
+- HTTP POST /login
+- reddis.command/GET
+- reddis.command/SETEX
+- sql:query
+- sql:exec
+
+You should be able to see how useful this would be for debugging issues. Trace IDs are returned on the response header 
+under the `Otel-Trace-Id` header. This trace ID is logged in any request related logs. 
+
+#### Database 
 
 We use an SQL builder package, [upper/db](https://upper.io/v4/) to build SQL queries. I prefer using an SQL builder for building queries 
 especially when filtering is involved as we can cleanly use logic to build the query. It also means we can freely 
 migrate between any of the SQL variants supported by the lib without breaking changes.
 
-#### Log Package
+The sub-package `adapter` is where we adapt our database to the interface required by our `internal/service` package.
+
+#### Log 
 
 Wrapping the [uber zap logger](https://github.com/uber-go/zap) package. Its generally just a logger I have used in the 
 past and provides everything I feel I need from a logger.
@@ -352,7 +372,7 @@ func furtherNestedFunc() {
 We want to make logging as easy as possible for the user, the more difficult it is, the less likely they are to log 
 any valuable information in pesky places.
 
-## Discover query
+## Discover Query
 
 Attractiveness adds a lot of overhead to the initial query, our attractiveness sorting algorithm:
 
@@ -530,18 +550,27 @@ migrations doesn't support query parameters, so you will need to manually edit i
 A gotcha for analysing the queries is data is cached for subsequent runs, so we need to reset and re-seed the entire
 database before each `EXPLAIN ANALYSE`.
 
-TODO link migrate readme.
-
 To do this, run:
 ```bash
 ./scripts/clean_db.sh true 
 ```
 
-This will clear all database volumes and reseed test data from scratch. The `true` flag denotes to seed test data.
- 
-I have decorated our go `scripts/go/migrate.go` script with optional seeding, this would allow any other users to 
-utilise the seeding feature for testing their own future feature queries etc. Without the hassle of figuring it out 
-themselves.
+## Location Data
+
+To calculate distances, we need to store location data, there were two obvious options to me for retrieving this data, 
+either the client would get the data and send it in requests, like our `/user/create` endpoint does, or our api can 
+retrieve the location data from the request IP address, like our `/login` and `/discover` endpoints do.
+
+I would lean towards handling it on the server via the request IP address, as it isn't much hassle and we can easily 
+cache requests like we have done to reduce any overhead. Consistency is key though and I would use the same method 
+for all endpoints, I have only decided to send the location data with the `/user/create` endpoint for ease of 
+adding random data locations since this isn't a production app.
+
+We use http://api.ipstack.com to get location data as it is a popular service which has a free tier for our purposes.
+
+## Scripts
+
+See our scripts [README](scripts/README.md) for a brief summary of available scripts. 
 
 ## Linting
 
@@ -553,4 +582,4 @@ golangci-lint run
 ```
 
 Linter configurations can be edited to suit the desired project needs in `.golangci.yml`. See [the docs](https://golangci-lint.run/usage/configuration)
-for available configurations.
+for available configurations. I always try to use a linter to enforce code standards and streamline the review process.

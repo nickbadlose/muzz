@@ -144,7 +144,7 @@ var availableLogLevels = []zapcore.Level{
 // logLevels converts the available log levels into a map with the string
 // representation of the level as the key and the level as the value.
 func logLevels() map[string]zapcore.Level {
-	m := make(map[string]zapcore.Level)
+	m := make(map[string]zapcore.Level, len(availableLogLevels))
 	for _, ll := range availableLogLevels {
 		m[ll.String()] = ll
 	}

@@ -69,7 +69,7 @@ func Attribute(key string, value any) attribute.KeyValue {
 // in content length information. This means the body cannot be prettified by the UI printing it. So it is advised to
 // set the Content-Length headers if possible.
 func attributesFromRequestDump(data []byte) []attribute.KeyValue {
-	attr := make([]attribute.KeyValue, 0)
+	attr := make([]attribute.KeyValue, 0, 2)
 	meta, body, split := strings.Cut(string(data), separator)
 	if !split {
 		attr = append(attr, attribute.String("http.request_dump", meta))

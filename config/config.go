@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -31,8 +32,14 @@ const (
 	cfgJaegerHost    = "JAEGER_HOST"
 	cfgDebugEnabled  = "DEBUG_ENABLED"
 
+	// environments.
+	productionEnv  = "production"
+	developmentEnv = "development"
+	dockerEnv      = "docker"
+
 	// default values.
-	defaultEnv         = "development"
+	defaultEnvFile     = "default"
+	defaultEnv         = developmentEnv
 	defaultPort        = "3000"
 	defaultJWTDuration = time.Hour * 6
 )
@@ -134,31 +141,45 @@ func MustLoad() *Config {
 }
 
 // Load the environment into the viper package and returns a new Config service to retrieve env vars. The env is
-// configured from a root level "<environment>.env" file and then overwriting with set environment variables.
+// configured from the "default.env" file, then overwriting with "<environment>.env" file and then overwriting
+// with set environment variables.
+//
+// For production and docker environments, env vars are retrieved always from the environment, and no env files are
+// read.
 func Load() (*Config, error) {
-
-	// TODO pass in paths ...string param, which adds config paths to search for env file.
-	//  This way we can keep env files in related packages
-
-	env := getEnv()
 	viper.AutomaticEnv()
+
+	env := strings.ToLower(getEnv())
+	// env files aren't used in production.
+	if env == productionEnv || env == dockerEnv {
+		return &Config{}, nil
+	}
 
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		return nil, errors.New("unable to get caller information")
 	}
 
-	// env files aren't used in production.
-	viper.AddConfigPath(fmt.Sprintf("%s/../", path.Dir(filename)))
-	viper.SetConfigName(env)
+	// read in default env vars
+	viper.AddConfigPath(path.Dir(filename))
+	viper.SetConfigName(defaultEnvFile)
 	viper.SetConfigType("env")
 	err := viper.ReadInConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// overwrite the default env vars with any environment specific env vars.
+	viper.SetConfigName(env)
+	err = viper.MergeInConfig()
 	if err != nil {
 		// this is the viper recommended way to check if the error is from no env file found.
 		// https://github.com/spf13/viper?tab=readme-ov-file#reading-config-files
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, err
 		}
+
+		log.Printf("unable to find env file: %s", err)
 	}
 
 	return &Config{}, nil

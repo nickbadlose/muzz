@@ -1,11 +1,21 @@
-# Tests
+# Integration tests
 
 Our integration tests are designed to be independent. To handle the creation, destruction and seeding of the test 
-database, we use [Golang-migrate](https://github.com/golang-migrate/migrate).
+database, we use [golang-migrate](https://github.com/golang-migrate/migrate).
 
 ## Running
 
-TODO setup docker without api profile and run.
+Before running the tests, we need to set up our test environment by running:
+
+```bash
+./scripts/run_dev.sh
+```
+
+Then to run the integration tests, we can run:
+
+```bash
+go test github.com/nickbadlose/muzz/test -count=1 
+```
 
 > To skip these tests add the `-short` flag to the `go test` command, for example `go test ./... -count=10 -short`. This
 is handy when wanting to run unit tests only or with multiple counts, as integration tests can take a long time.
@@ -48,10 +58,9 @@ write them properly ;)
 
 #### GeoIP requests
 
-Since we have a free account, with limited requests per month, we mock calling this service.
-
-This unfortunately means we cannot just call api.NewServer to run integration tests and we have to manually build the 
-handlers with a helper function :(
+Since we have a free account, with limited requests per month, we mock calling this service. This unfortunately means 
+we cannot just call api.NewServer to run integration tests, and we have to manually build the handlers with a 
+helper function :(
 
 #### Running tests in parallel
 

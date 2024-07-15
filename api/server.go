@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/nickbadlose/muzz/api/handlers"
 	"github.com/nickbadlose/muzz/api/router"
@@ -14,6 +15,13 @@ import (
 	"github.com/nickbadlose/muzz/internal/location"
 	"github.com/nickbadlose/muzz/internal/service"
 	"go.opentelemetry.io/otel/trace"
+)
+
+const (
+	// timeouts.
+	readHeaderTimeout = 5 * time.Second
+	writeTimeout      = 10 * time.Second
+	readTimeout       = readHeaderTimeout + writeTimeout
 )
 
 // NewServer builds a new *http.Server, configured with the provided database, cache and tracer.
@@ -67,14 +75,16 @@ func NewServer(cfg *config.Config, db *database.Database, c *cache.Cache, tp tra
 		return nil, err
 	}
 
-	routes, err := router.New(cfg, handler, authoriser, tp)
+	r, err := router.New(cfg, handler, authoriser, tp)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO server configuration
 	return &http.Server{
-		Handler: routes,
-		Addr:    cfg.Port(),
+		Addr:              cfg.Port(),
+		Handler:           r,
+		ReadTimeout:       readTimeout,
+		ReadHeaderTimeout: readHeaderTimeout,
+		WriteTimeout:      writeTimeout,
 	}, nil
 }
