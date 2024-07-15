@@ -569,6 +569,8 @@ We use http://api.ipstack.com to get location data as it is a popular service wh
 A quick reference for any tools we are using.
 
 - Traces are hosted at http://localhost:16686/search. Make some requests and check out the tags.
+- [Postman collection](https://www.postman.com/nickbadlose/workspace/muzz-api/collection/13188383-3d2cd57a-d0c4-43bb-ad64-0333f8a67deb?action=share&creator=13188383)
+  for making requests against the api. See the [endpoints section](#endpoints) for more information.
 - Adminer is hosted at http://localhost:8080/?pgsql=db&username=muzz_admin&db=muzz for viewing the database. Log in 
   and do what you need.
 - Migration tool is hosted [here.](scripts/go/migrate/README.md)
