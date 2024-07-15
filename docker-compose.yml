@@ -77,7 +77,15 @@ services:
     networks:
       - api
 
-# TODO adminer
+  adminer:
+    image: adminer:4.8.1-standalone
+    restart: always
+    ports:
+      - "8080:8080"
+    links:
+      - db
+    networks:
+      - api
 
 volumes:
   database: {}

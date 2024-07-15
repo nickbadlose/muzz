@@ -1,20 +1,15 @@
 # Muzz Tech Test
 
-
 - [Running the Application](#running-the-application)
 - [Testing the Application](#testing-the-application)
 - [Endpoints](#endpoints)
-- [Config](#config)
 - [Application Architecture](#application-architecture)
 - [Code Architecture](#code-architecture)
 - [Internal Packages](#internal-packages)
+- [Config](#config)
 - [Discover Query](#discover-query)
 - [Location Data](#location-data)
-- [Scripts](#scripts)
-- [Linting](#linting)
-
-## TODO
-- Adminer and redis commander https://hub.docker.com/r/rediscommander/redis-commander?
+- [Tools](#tools)
 
 ## Running the Application
 
@@ -211,18 +206,6 @@ example response:
 }
 ```
 
-## Config
-
-Usually I would not push an env file to version control, however for this project it makes some sense, given it isn't 
-a production project and will stop me having to provide env vars.
-
-If you wish to edit any env vars, go to the `config/default.env` and edit them accordingly in there. This env file is 
-used as the source of our docker containers environment variables.
-
-> **NOTE** If we change the database or cache credentials in the default.env file after a docker volume has been 
-> created, restarting the containers will update the env vars, but not the auth. You will need to clear the volumes 
-> to do this by running `./scripts/clear_data.sh`. Then you should be good to go.
-
 ## Application Architecture
 
 Monolith architecture currently, whilst microservices bring a lot of benefits, they also bring a lot of initial 
@@ -371,6 +354,19 @@ func furtherNestedFunc() {
 
 We want to make logging as easy as possible for the user, the more difficult it is, the less likely they are to log 
 any valuable information in pesky places.
+
+## Config
+
+Usually I would not push an env file to version control, however for this project it makes some sense, given it isn't
+a production project and will stop me having to provide env vars.
+
+If you wish to edit any env vars, go to the `config/default.env` and edit them accordingly in there. This env file is
+used as the source of our docker containers environment variables.
+
+> **NOTE** If we change the database or cache credentials in the default.env file after a docker volume has been
+> created, restarting the containers will update the env vars, but not the auth. You will need to clear the volumes
+> to do this by running `./scripts/clear_data.sh`. Then you should be good to go.
+
 
 ## Discover Query
 
@@ -568,18 +564,15 @@ adding random data locations since this isn't a production app.
 
 We use http://api.ipstack.com to get location data as it is a popular service which has a free tier for our purposes.
 
-## Scripts
+## Tools
 
-See our scripts [README](scripts/README.md) for a brief summary of available scripts. 
+A quick reference for any tools we are using.
 
-## Linting
-
-We use `golangci-lint` for linting, to install, go to [golangci-lint](https://golangci-lint.run/welcome/install/#local-installation).
-
-To run the linter, run:
-```bash
-golangci-lint run 
-```
-
-Linter configurations can be edited to suit the desired project needs in `.golangci.yml`. See [the docs](https://golangci-lint.run/usage/configuration)
-for available configurations. I always try to use a linter to enforce code standards and streamline the review process.
+- Traces are hosted at http://localhost:16686/search. Make some requests and check out the tags.
+- Adminer is hosted at http://localhost:8080/?pgsql=db&username=muzz_admin&db=muzz for viewing the database. Log in 
+  and do what you need.
+- Migration tool is hosted [here.](scripts/go/migrate/README.md)
+- Scripts are hosted [here.](scripts/README.md)
+- For linting we use [golangci-lint](https://golangci-lint.run/welcome/install/#local-installation). 
+  `golangci-lint run` to run it. The config file is in the `.golangci.yml`. See [the docs](https://golangci-lint.run/usage/configuration)
+  for available configurations.
