@@ -80,11 +80,9 @@ func NewServer(cfg *config.Config, db *database.Database, c *cache.Cache, tp tra
 		return nil, err
 	}
 
+	http.DefaultServeMux.Handle("/", r)
+
 	return &http.Server{
-		Addr:              cfg.Port(),
-		Handler:           r,
-		ReadTimeout:       readTimeout,
-		ReadHeaderTimeout: readHeaderTimeout,
-		WriteTimeout:      writeTimeout,
+		Addr: cfg.Port(),
 	}, nil
 }

@@ -9,6 +9,7 @@
 - [Config](#config)
 - [Discover Query](#discover-query)
 - [Location Data](#location-data)
+- [Profiling](#profiling)
 - [Tools](#tools)
 
 ## Running the Application
@@ -565,6 +566,22 @@ for all endpoints, I have only decided to send the location data with the `/user
 adding random data locations since this isn't a production app.
 
 We use http://api.ipstack.com to get location data as it is a popular service which has a free tier for our purposes.
+
+## Profiling
+
+- https://github.com/google/pprof/blob/main/doc/README.md#interpreting-the-callgraph
+
+To load test the server, we can utilise the `hey` command line tool:
+
+```bash
+hey -m GET -c 20 -n 500 -H "Content-Type: application/json" -H "True-Client-IP: 51.146.90.158" -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySUQiOjEwMDAwMDEsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6MzAwMCIsImF1ZCI6WyJodHRwOi8vbG9jYWxob3N0OjMwMDAiXSwiZXhwIjoxNzIxODk2MDcxLCJuYmYiOjE3MjE4NTI4NzEsImlhdCI6MTcyMTg1Mjg3MX0.t6tGLuS0xmrkBIDwlYXcIGp-20anIkck5fX2WgUrkAA" "http://localhost:3000/discover??sort=attractiveness&maxAge=30&minAge=20&genders=male,unspecified,female"
+```
+
+We can run the profiling tool whilst running this:
+
+```bash
+go tool pprof http://localhost:3000/debug/pprof/profile
+```
 
 ## Tools
 

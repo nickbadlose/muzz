@@ -1,6 +1,6 @@
 INSERT INTO public."user" (email, password, name, gender, age, location)
 SELECT
-    'email-' || round(random()*100000000) || '-' ||  round(random()*100000000) || '-' ||  round(random()*100000000) || '@email.com',
+    'email-' || round(random()*100000000) || '-' || vtab || '@email.com',
     '$2a$06$ewczVCXHOOgz2K0AdtTDauqMMhoUAcQu2AOng0CZdOrgu4QgHFpLK',
     'name',
     (array['male','female','unspecified'])[floor(random() * 3 + 1)],
@@ -13,8 +13,8 @@ DO $FN$
     DECLARE rand int;
     -- backup random integers in case rand matches the current user_id in the swipe insert.
     DECLARE secondary_rand int;
-        -- users is the number of users to seed data for
-        DECLARE users int = 10000;
+    -- users is the number of users to seed data for
+    DECLARE users int = 10000;
     BEGIN
         -- 5% of users will be simulated as inactive
         FOR counter IN 1..(users-(users / 20)) LOOP

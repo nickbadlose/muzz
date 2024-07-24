@@ -5,6 +5,7 @@ import (
 	"github.com/nickbadlose/muzz/api"
 	"go.uber.org/zap"
 	"log"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"syscall"
