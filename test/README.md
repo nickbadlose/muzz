@@ -50,7 +50,7 @@ If you encounter any dirty database errors from the migrator, sometimes these ca
 shutting down, you'll need to [fix the database version](https://github.com/golang-migrate/migrate/blob/master/FAQ.md#what-does-dirty-database-mean) 
 to run them again without errors. 
 
-The easiest way to force fix this, in dev and test envs at least, is to just run `./scripts/reset_db.sh` to completely 
+The easiest way to force fix this, in dev and test envs at least, is to just run `./scripts/clean_db.sh` to completely 
 rest the database docker service to its original state and run `go test ./... -count=1` again.
 
 There is also the very real possibility that your up or down migrations are configured incorrectly, in which case, 

@@ -171,13 +171,15 @@ example response:
 
 ```json
 {
-    "result": {
-        "id": "<integer>",
-        "name": "<string>",
-        "gender": "<string>",
-        "age": "<integer>",
-        "distanceFromMe": "<float>"
+  "results": [
+    {
+      "id":"<integer>",
+      "name": "<string>",
+      "gender": "<string>",
+      "age": "<integer>",
+      "distanceFromMe": "<float>"
     }
+  ]
 }
 ```
 
@@ -311,7 +313,7 @@ migrate between any of the SQL variants supported by the lib without breaking ch
 
 The sub-package `adapter` is where we adapt our database to the interface required by our `internal/service` package.
 
-#### Log 
+#### Logger 
 
 Wrapping the [uber zap logger](https://github.com/uber-go/zap) package. Its generally just a logger I have used in the 
 past and provides everything I feel I need from a logger.
@@ -441,8 +443,8 @@ Execution Time: 46852.974 ms
 
 Execution time - 46 seconds, with just 10000 users, yikes :( as suspected, this is not viable for production code.
 
-From the plan we can see that roughly 25 seconds (~5*4904) was spent on subquery 1 - `Aggregate  (cost=3582.00..3582.01 rows=1 
-width=8) (actual time=5.025..5.025 rows=1 loops=4904)` and roughly 20 seconds (~4.3*4904) was spent on subquery 2 
+From the plan we can see that roughly 25 seconds (~5 * 4904) was spent on subquery 1 - `Aggregate  (cost=3582.00..3582.01 rows=1 
+width=8) (actual time=5.025..5.025 rows=1 loops=4904)` and roughly 20 seconds (~4.3 * 4904) was spent on subquery 2 
 `Aggregate  (cost=3582.03..3582.04 rows=1 width=8) (actual time=4.374..4.374 rows=1 loops=4904)`. So since that consists 
 of ~99% of the time taken, that is where we can focus our attention for optimising the query.
 
