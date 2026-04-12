@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  labels:
+    app: db
+    app.kubernetes.io/name: db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+      app.kubernetes.io/name: db
+  template:
+    metadata:
+      labels:
+        app: db
+        app.kubernetes.io/name: db
+    spec:
+      containers:
+        - name: db
+          image: postgis/postgis:16-3.4
+          env:
+            - name: POSTGRES_DB
+              value: muzz
+            - name: POSTGRES_USER
+              value: muzz_admin
+            - name: POSTGRES_PASSWORD
+              value: djdw4r4-3!L56gp!
+          imagePullPolicy: Always
+          ports:
+            - name: tcp
+              containerPort: 5432
+              protocol: TCP
+#          volumeMounts:
+#            - mountPath: /docker-entrypoint-initdb.d
+#              name: startup-sql
+#      volumes:
+#        - name: startup-sql
+#          hostPath:
+#            path: /Users/nick/projects/muzz/migrations
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  labels:
+    app: db
+    app.kubernetes.io/name: db
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: tcp
+  selector:
+    app.kubernetes.io/name: db

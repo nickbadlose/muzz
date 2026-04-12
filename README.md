@@ -12,6 +12,15 @@
 - [Profiling](#profiling)
 - [Tools](#tools)
 
+## TODO
+
+- Do not refer to k8 base
+- Skaffold
+- Istio
+- Helm
+- EKS terraform
+- Prometheus and Grafana
+
 ## Running the Application
 
 Then to start the application, run:

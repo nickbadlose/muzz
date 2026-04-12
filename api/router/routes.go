@@ -1,11 +1,12 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
 	"github.com/nickbadlose/muzz/api/handlers"
 	"github.com/nickbadlose/muzz/internal/auth"
-	"net/http"
 )
 
 func addPublicRoutes(r *chi.Mux, h *handlers.Handlers) {

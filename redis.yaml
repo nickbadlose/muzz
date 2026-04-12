@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache
+  labels:
+    app: cache
+    app.kubernetes.io/name: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cache
+      app.kubernetes.io/name: cache
+  template:
+    metadata:
+      labels:
+        app: cache
+        app.kubernetes.io/name: cache
+    spec:
+      containers:
+        - name: cache
+          image: postgis/postgis:16-3.4
+          env:
+            - name: POSTGRES_DB
+              value: muzz
+            - name: POSTGRES_USER
+              value: muzz_admin
+            - name: POSTGRES_PASSWORD
+              value: djdw4r4-3!L56gp!
+          imagePullPolicy: Always
+          ports:
+            - name: tcp
+              containerPort: 5432
+              protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache
+  labels:
+    app: cache
+    app.kubernetes.io/name: cache
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: tcp
+  selector:
+    app.kubernetes.io/name: cache

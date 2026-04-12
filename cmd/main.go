@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"github.com/nickbadlose/muzz/api"
 	"go.uber.org/zap"
 	"log"
 	_ "net/http/pprof"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	"github.com/nickbadlose/muzz/api"
 	"github.com/nickbadlose/muzz/config"
 	internalcache "github.com/nickbadlose/muzz/internal/cache"
 	"github.com/nickbadlose/muzz/internal/database"
@@ -57,18 +57,19 @@ func main() {
 		logger.Fatal(ctx, "failed to initialise database", zap.Error(err))
 	}
 
-	cache, err := internalcache.New(
-		ctx,
-		&internalcache.Credentials{
-			Host:     cfg.CacheHost(),
-			Password: cfg.CachePassword(),
-		},
-		internalcache.WithDebugMode(cfg.DebugEnabled()),
-		internalcache.WithTraceProvider(tp),
-	)
-	if err != nil {
-		logger.Fatal(ctx, "failed to initialise cache", zap.Error(err))
-	}
+	cache := &internalcache.Cache{}
+	//cache, err := internalcache.New(
+	//	ctx,
+	//	&internalcache.Credentials{
+	//		Host:     cfg.CacheHost(),
+	//		Password: cfg.CachePassword(),
+	//	},
+	//	internalcache.WithDebugMode(cfg.DebugEnabled()),
+	//	internalcache.WithTraceProvider(tp),
+	//)
+	//if err != nil {
+	//	logger.Fatal(ctx, "failed to initialise cache", zap.Error(err))
+	//}
 
 	srv, err := api.NewServer(cfg, db, cache, tp)
 	if err != nil {

@@ -1,0 +1,77 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  labels:
+    app: app
+    app.kubernetes.io/name: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: app
+      app.kubernetes.io/name: app
+  template:
+    metadata:
+      labels:
+        app: app
+        app.kubernetes.io/name: app
+    spec:
+      containers:
+        - name: app
+          image: muzz-api:latest
+          env:
+            - name: ENVIRONMENT
+              value: kubernetes
+            - name: PORT
+              value: "3000"
+            - name: DATABASE
+              value: muzz
+            - name: DATABASE_USER
+              value: muzz_admin
+            - name: DATABASE_PASSWORD
+              value: djdw4r4-3!L56gp!
+            - name: DATABASE_HOST
+              value: db:5432
+            - name: LOG_LEVEL
+              value: debug
+            - name: DOMAIN_NAME
+              value: http://localhost:3000
+            - name: JWT_DURATION
+              value: 12h
+            - name: JWT_SECRET
+              value: secret_value
+            - name: GEOIP_API_KEY
+              value: 2e7b59e8298092f83a4debc49380cbbb
+            - name: GEOIP_ENDPOINT
+              value: http://api.ipstack.com
+            - name: CACHE_PASSWORD
+              value: 3fwrg45!-dr53GH-
+            - name: CACHE_HOST
+              value: cache:6379
+            - name: DEBUG_ENABLED
+              value: "true"
+          # https://stackoverflow.com/a/52763242/22675476 necessary for pulling local images
+#          TODO try Always
+          imagePullPolicy: Never
+          ports:
+            - name: tcp
+              containerPort: 3000
+              protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  labels:
+    app: app
+    app.kubernetes.io/name: app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: tcp
+  selector:
+    app.kubernetes.io/name: app
